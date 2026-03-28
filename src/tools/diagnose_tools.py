@@ -201,6 +201,10 @@ def compute_cascade_impact(role_id: str, scenario_id: str) -> dict:
     # Use a default gap score based on whether role is filled
     gap_score = 0.7 if role.get("current_holder_id") else 1.0
 
+    # Check if this is a leaf node (no downstream edges) to report direction
+    raw_upstream_ids = {d["upstream_unit_id"] for d in raw_deps}
+    is_leaf = role["org_unit_id"] not in raw_upstream_ids
+
     chain = compute_cascade(
         start_unit_id=role["org_unit_id"],
         gap_score=gap_score,
@@ -218,6 +222,7 @@ def compute_cascade_impact(role_id: str, scenario_id: str) -> dict:
     return {
         "role_title": role["title"],
         "scenario_name": scenario["name"],
+        "cascade_direction": "upstream (leaf node — units that depend on this unit)" if is_leaf else "downstream",
         "cascade_chain": chain,
         "total_impact_eur": sum(n.get("estimated_cost_eur", 0) for n in chain),
         "optimal_intervention": intervention,

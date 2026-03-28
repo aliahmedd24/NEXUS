@@ -6,6 +6,7 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.routes import diagnose, learn, scenarios, staff, what_if
 from src.config import settings
 
 structlog.configure(
@@ -30,6 +31,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ─── Route Registration ────────────────────────────────────────────────
+app.include_router(scenarios.router)
+app.include_router(diagnose.router)
+app.include_router(staff.router)
+app.include_router(learn.router)
+app.include_router(what_if.router)
 
 
 @app.get("/health")

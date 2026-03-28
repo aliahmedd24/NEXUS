@@ -36,17 +36,19 @@ class ScenarioAnalysisOutput(BaseModel):
 class VulnerabilityHeatmapCell(BaseModel):
     """One cell in the vulnerability heatmap."""
 
+    role_id: str = Field(description="UUID of the role — needed by cascade_modeler")
     role_title: str
     leader_name: str | None = None
     gap_score: float = Field(ge=0.0, le=1.0)
     status: str = Field(description="green, yellow, or red")
     top_gap_dimensions: list[str] = []
-    bench_strength: int = Field(ge=0, le=3)
+    bench_strength: int = Field(ge=0)
 
 
 class VulnerabilityReportOutput(BaseModel):
     """Output schema for Vulnerability Scanner Agent."""
 
+    scenario_id: str = Field(description="UUID of the scenario — needed by cascade_modeler")
     scenario_name: str
     aggregate_resilience_score: float = Field(ge=0.0, le=1.0)
     critical_count: int
@@ -112,6 +114,7 @@ class AdaptedJDOutput(BaseModel):
 class CandidateRankingEntry(BaseModel):
     """One candidate in the ranking."""
 
+    candidate_id: str = Field(description="UUID of the candidate leader — needed by team_chemistry")
     candidate_name: str
     leader_type: str
     overall_fit_score: float = Field(ge=0.0, le=1.0)
@@ -128,6 +131,9 @@ class GenomeAnalysisOutput(BaseModel):
 
     role_type: str
     scenario_name: str
+    org_unit_id: str = Field(
+        description="UUID of the org unit for the target role — needed by team_chemistry",
+    )
     ranked_candidates: list[CandidateRankingEntry]
     bias_detection_summary: str = Field(
         description="Summary of bias corrections applied",

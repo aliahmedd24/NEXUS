@@ -31,26 +31,33 @@ def compute_cascade(
     max_depth = 5
     min_impact = 0.1
 
-    # Build adjacency list: upstream -> list of (downstream, coupling, type)
-    adj: dict[str, list[tuple[str, float, str]]] = {}
+    # Build adjacency lists in both directions
+    adj_down: dict[str, list[tuple[str, float, str]]] = {}
+    adj_up: dict[str, list[tuple[str, float, str]]] = {}
     for dep in dependencies:
         upstream = dep["upstream"]
         downstream = dep["downstream"]
         coupling = dep.get("coupling_strength", 0.5)
         dep_type = dep.get("dependency_type", "unknown")
-        adj.setdefault(upstream, []).append((downstream, coupling, dep_type))
+        adj_down.setdefault(upstream, []).append((downstream, coupling, dep_type))
+        adj_up.setdefault(downstream, []).append((upstream, coupling, dep_type))
+
+    # If the start unit has no downstream edges, it is a leaf node.
+    # A leaf failure cascades UPSTREAM — units that depend on it are affected.
+    has_downstream = start_unit_id in adj_down
+    adj = adj_down if has_downstream else adj_up
 
     visited: set[str] = {start_unit_id}
     queue: deque[tuple[str, float, int]] = deque()
     cascade: list[dict] = []
 
-    # Seed with direct downstream dependencies
+    # Seed with direct neighbors (downstream, or upstream for leaf nodes)
     initial_impact = gap_score * scenario_severity
-    for downstream, coupling, dep_type in adj.get(start_unit_id, []):
+    for neighbor, coupling, dep_type in adj.get(start_unit_id, []):
         impact = initial_impact * coupling
-        if impact >= min_impact and downstream not in visited:
-            queue.append((downstream, impact, 1))
-            visited.add(downstream)
+        if impact >= min_impact and neighbor not in visited:
+            queue.append((neighbor, impact, 1))
+            visited.add(neighbor)
 
     while queue:
         unit_id, impact, depth = queue.popleft()
@@ -77,11 +84,11 @@ def compute_cascade(
 
         # Continue BFS if within limits
         if depth < max_depth:
-            for downstream, coupling, dep_type in adj.get(unit_id, []):
+            for neighbor, coupling, dep_type in adj.get(unit_id, []):
                 child_impact = impact * coupling
-                if child_impact >= min_impact and downstream not in visited:
-                    queue.append((downstream, child_impact, depth + 1))
-                    visited.add(downstream)
+                if child_impact >= min_impact and neighbor not in visited:
+                    queue.append((neighbor, child_impact, depth + 1))
+                    visited.add(neighbor)
 
     return cascade
 

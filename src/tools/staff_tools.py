@@ -444,7 +444,7 @@ def compute_candidate_fit(
     }
 
 
-def rank_candidates(role_type: str, scenario_id: str = "") -> list[dict]:
+def rank_candidates(role_type: str, scenario_id: str = "") -> dict:
     """Rank all candidates by fit score for a role under a scenario.
 
     Calls get_candidate_pool and compute_candidate_fit per candidate,
@@ -455,7 +455,7 @@ def rank_candidates(role_type: str, scenario_id: str = "") -> list[dict]:
         scenario_id: Optional scenario UUID for scenario-adapted ranking.
 
     Returns:
-        Sorted list of candidate fit reports (highest fit first).
+        Dict with org_unit_id, role_type, and candidates list sorted by fit.
     """
     pool = get_candidate_pool(role_type)
     rankings: list[dict] = []
@@ -470,7 +470,16 @@ def rank_candidates(role_type: str, scenario_id: str = "") -> list[dict]:
             rankings.append(fit)
 
     rankings.sort(key=lambda x: x["overall_fit_score"], reverse=True)
-    return rankings
+
+    # Include org_unit_id for the target role so downstream agents can use it
+    roles = fetch_by_column("roles", "title", role_type)
+    org_unit_id = roles[0]["org_unit_id"] if roles else None
+
+    return {
+        "org_unit_id": org_unit_id,
+        "role_type": role_type,
+        "candidates": rankings,
+    }
 
 
 # ─── Team Chemistry Tools ──────────────────────────────────────────────
@@ -789,7 +798,8 @@ def generate_staffing_plan(
                 role_type = jd["role_type"]
 
         # Rank candidates for this role under the scenario
-        ranked = rank_candidates(role_type, scenario_id)
+        ranked_result = rank_candidates(role_type, scenario_id)
+        ranked = ranked_result.get("candidates", []) if isinstance(ranked_result, dict) else ranked_result
         cands: list[dict] = []
         for r in ranked[:5]:  # Top 5 per role
             cost = 180_000 if r.get("leader_type") == "external_candidate" else 50_000

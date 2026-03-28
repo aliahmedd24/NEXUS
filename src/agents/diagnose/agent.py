@@ -4,6 +4,7 @@ Agents: Scenario Architect -> Vulnerability Scanner -> Cascade Modeler
 Pattern: SequentialAgent with structured output schemas and validation callbacks.
 """
 
+import click
 from google.adk.agents import LlmAgent, SequentialAgent
 from google.genai import types
 
@@ -27,6 +28,12 @@ from src.tools.diagnose_tools import (
     scan_vulnerabilities,
 )
 
+
+def _log_tool_call(tool, args, tool_context):
+    """Print tool calls to terminal so the user sees progress."""
+    click.echo(f"  ⚙ {tool.name}({', '.join(f'{k}={v!r}' for k, v in args.items())})", err=True)
+    return None
+
 scenario_architect = LlmAgent(
     name="scenario_architect",
     model=settings.gemini_model_fast,
@@ -38,7 +45,11 @@ scenario_architect = LlmAgent(
     tools=[get_scenario_library, get_scenario_by_name, create_compound_scenario],
     output_schema=ScenarioAnalysisOutput,
     output_key="scenario_analysis",
-    generate_content_config=types.GenerateContentConfig(temperature=0.2),
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.2,
+        thinking_config=types.ThinkingConfig(include_thoughts=True),
+    ),
+    before_tool_callback=_log_tool_call,
 )
 
 vulnerability_scanner = LlmAgent(
@@ -52,7 +63,11 @@ vulnerability_scanner = LlmAgent(
     tools=[scan_vulnerabilities, identify_single_points_of_failure],
     output_schema=VulnerabilityReportOutput,
     output_key="vulnerability_report",
-    generate_content_config=types.GenerateContentConfig(temperature=0.1),
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.1,
+        thinking_config=types.ThinkingConfig(include_thoughts=True),
+    ),
+    before_tool_callback=_log_tool_call,
 )
 
 cascade_modeler = LlmAgent(
@@ -66,7 +81,11 @@ cascade_modeler = LlmAgent(
     tools=[compute_cascade_impact],
     output_schema=CascadeReportOutput,
     output_key="cascade_report",
-    generate_content_config=types.GenerateContentConfig(temperature=0.2),
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.2,
+        thinking_config=types.ThinkingConfig(include_thoughts=True),
+    ),
+    before_tool_callback=_log_tool_call,
 )
 
 # DIAGNOSE Pipeline: Sequential — scenario -> vulnerability -> cascade

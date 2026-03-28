@@ -31,7 +31,10 @@ orchestrator_agent = LlmAgent(
         brief_generator_agent,
     ],
     output_key="session_output",
-    generate_content_config=types.GenerateContentConfig(temperature=0.3),
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.3,
+        thinking_config=types.ThinkingConfig(include_thoughts=True),
+    ),
 )
 
 # ADK framework entry point

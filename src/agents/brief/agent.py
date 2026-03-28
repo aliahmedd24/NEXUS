@@ -25,5 +25,8 @@ brief_generator_agent = LlmAgent(
     tools=[surface_dissent, compute_confidence_rating],
     output_schema=DecisionBriefOutput,
     output_key="decision_brief",
-    generate_content_config=types.GenerateContentConfig(temperature=0.3),
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.3,
+        thinking_config=types.ThinkingConfig(include_thoughts=True),
+    ),
 )

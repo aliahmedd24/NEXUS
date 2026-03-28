@@ -31,6 +31,22 @@ def test_cascade_includes_direct_dependency():
     assert chain[0]["impact_score"] > 0.5
 
 
+def test_cascade_traverses_upstream_for_leaf_nodes():
+    """Leaf nodes (no downstream edges) cascade upstream to units that depend on them."""
+    deps = [
+        {"upstream": "A", "downstream": "B", "coupling_strength": 0.8, "dependency_type": "budget"},
+        {"upstream": "C", "downstream": "B", "coupling_strength": 0.7, "dependency_type": "shared_resource"},
+    ]
+    # B is a leaf — only appears as downstream, never as upstream
+    chain = compute_cascade("B", 1.0, deps, 0.8)
+    assert len(chain) >= 1
+    unit_ids = [n["org_unit_id"] for n in chain]
+    # Should traverse upstream to A and/or C
+    assert "A" in unit_ids or "C" in unit_ids
+    # Should NOT be empty like it was before the fix
+    assert len(chain) > 0
+
+
 def test_find_optimal_intervention():
     """Intervention finder returns a node."""
     cascade = [

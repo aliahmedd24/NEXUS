@@ -4,8 +4,15 @@ Agents: JD Generator -> Genome Agent -> Team Chemistry -> Portfolio Optimizer
 Pattern: SequentialAgent with structured output schemas and validation callbacks.
 """
 
+import click
 from google.adk.agents import LlmAgent, SequentialAgent
 from google.genai import types
+
+
+def _log_tool_call(tool, args, tool_context):
+    """Print tool calls to terminal so the user sees progress."""
+    click.echo(f"  ⚙ {tool.name}({', '.join(f'{k}={v!r}' for k, v in args.items())})", err=True)
+    return None
 
 from src.agents.prompts import (
     GENOME_AGENT_INSTRUCTION,
@@ -46,7 +53,11 @@ jd_generator_agent = LlmAgent(
     tools=[get_jd_template, adapt_jd_to_scenario, critique_jd],
     output_schema=AdaptedJDOutput,
     output_key="adapted_jd",
-    generate_content_config=types.GenerateContentConfig(temperature=0.2),
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.2,
+        thinking_config=types.ThinkingConfig(include_thoughts=True),
+    ),
+    before_tool_callback=_log_tool_call,
 )
 
 genome_agent = LlmAgent(
@@ -60,7 +71,11 @@ genome_agent = LlmAgent(
     tools=[get_candidate_pool, get_leader_genome, compute_candidate_fit, rank_candidates],
     output_schema=GenomeAnalysisOutput,
     output_key="genome_analysis",
-    generate_content_config=types.GenerateContentConfig(temperature=0.1),
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.1,
+        thinking_config=types.ThinkingConfig(include_thoughts=True),
+    ),
+    before_tool_callback=_log_tool_call,
 )
 
 team_chemistry_agent = LlmAgent(
@@ -74,7 +89,11 @@ team_chemistry_agent = LlmAgent(
     tools=[get_existing_team, compute_team_compatibility],
     output_schema=TeamChemistryOutput,
     output_key="chemistry_report",
-    generate_content_config=types.GenerateContentConfig(temperature=0.2),
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.2,
+        thinking_config=types.ThinkingConfig(include_thoughts=True),
+    ),
+    before_tool_callback=_log_tool_call,
 )
 
 portfolio_optimizer_agent = LlmAgent(
@@ -94,7 +113,11 @@ portfolio_optimizer_agent = LlmAgent(
     ],
     output_schema=PortfolioOptimizerOutput,
     output_key="staffing_plan",
-    generate_content_config=types.GenerateContentConfig(temperature=0.2),
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.2,
+        thinking_config=types.ThinkingConfig(include_thoughts=True),
+    ),
+    before_tool_callback=_log_tool_call,
 )
 
 # STAFF Pipeline: Sequential — JD adapt -> genome scoring -> chemistry -> portfolio

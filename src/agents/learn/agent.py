@@ -44,7 +44,10 @@ decision_replay_agent = LlmAgent(
     ],
     output_schema=ReplayAnalysisOutput,
     output_key="replay_analysis",
-    generate_content_config=types.GenerateContentConfig(temperature=0.1),
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.1,
+        thinking_config=types.ThinkingConfig(include_thoughts=True),
+    ),
 )
 
 pattern_intelligence_agent = LlmAgent(
@@ -63,7 +66,10 @@ pattern_intelligence_agent = LlmAgent(
     ],
     output_schema=LearningReportOutput,
     output_key="learning_report",
-    generate_content_config=types.GenerateContentConfig(temperature=0.1),
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.1,
+        thinking_config=types.ThinkingConfig(include_thoughts=True),
+    ),
 )
 
 # LEARN Pipeline: Sequential — replay decisions -> detect patterns -> update calibration
