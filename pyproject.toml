@@ -1,0 +1,49 @@
+[project]
+name = "nexus"
+version = "0.1.0"
+description = "Multi-agent decision intelligence platform for leadership hiring at BMW Group"
+requires-python = ">=3.12"
+dependencies = [
+    # Core
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    # Supabase
+    "supabase>=2",
+    # Google ADK
+    "google-adk>=1",
+    # LLM
+    "google-genai>=1",
+    # Data & Computation
+    "numpy>=2.2",
+    "scipy>=1.15",
+    # Utilities
+    "python-dotenv>=1.0",
+    "structlog>=24.4",
+    "httpx>=0.28",
+    # Synthetic data generation
+    "faker>=33",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "black>=24.10",
+    "isort>=5.13",
+]
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+
+[tool.uv]
+# storage3 >=2.20 depends on pyiceberg which requires MSVC C++ build tools.
+# We don't use Supabase Storage Iceberg features, so pin to 2.19 which lacks that dep.
+override-dependencies = ["storage3==2.19.0"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

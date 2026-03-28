@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+venv/
+.venv/
+.python-version
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+service-account*.json
+
+# Agent / AI internal dirs
+.claude/
+.gemini/
+.cursor/
+.copilot/
+.aider*
+
+# MCP server config (contains project-specific keys/paths)
+.mcp.json
+
+# Planning & PRD docs (internal only)
+PHASE_*.md
+NEXUS_PRD_INDEX.md
+ADK_IMPLEMENTATION_GUIDE.md
+SESSION_INIT.md
+CLAUDE.md.md
+LOG.md
+
+# Supabase local
+.supabase/
+
+# Node
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Lock files (uv)
+# uv.lock is committed for reproducibility
