@@ -1,5 +1,38 @@
-"""NEXUS root agent entry point.
+"""NEXUS root agent — the Orchestrator.
 
-The root_agent variable is the ADK framework entry point.
-This module will be fully implemented in Phase 7.
+Routes user intent to DIAGNOSE, STAFF, or LEARN pipelines and manages
+session context across modes. This is the ADK framework entry point.
 """
+
+from google.adk.agents import LlmAgent
+from google.genai import types
+
+from src.agents.brief.agent import brief_generator_agent
+from src.agents.diagnose.agent import diagnose_pipeline
+from src.agents.learn.agent import learn_pipeline
+from src.agents.prompts import ORCHESTRATOR_INSTRUCTION
+from src.agents.staff.agent import staff_pipeline
+from src.config import settings
+from src.tools.orchestrator_tools import suggest_scenarios
+
+orchestrator_agent = LlmAgent(
+    name="orchestrator",
+    model=settings.gemini_model_fast,
+    description=(
+        "NEXUS session router. Matches user intent to DIAGNOSE, STAFF, "
+        "or LEARN mode and manages scenario context across modes."
+    ),
+    instruction=ORCHESTRATOR_INSTRUCTION,
+    tools=[suggest_scenarios],
+    sub_agents=[
+        diagnose_pipeline,
+        staff_pipeline,
+        learn_pipeline,
+        brief_generator_agent,
+    ],
+    output_key="session_output",
+    generate_content_config=types.GenerateContentConfig(temperature=0.3),
+)
+
+# ADK framework entry point
+root_agent = orchestrator_agent

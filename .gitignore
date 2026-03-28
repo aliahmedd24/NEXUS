@@ -19,6 +19,9 @@ venv/
 *.key
 credentials.json
 service-account*.json
+*.secret
+secrets/
+token.json
 
 # Agent / AI internal dirs
 .claude/
@@ -37,6 +40,8 @@ ADK_IMPLEMENTATION_GUIDE.md
 SESSION_INIT.md
 CLAUDE.md.md
 LOG.md
+MOCK_DB/
+skills-lock.json
 
 # Supabase local
 .supabase/

@@ -5,11 +5,12 @@
 
 ## Overview
 
-NEXUS stress-tests organizational leadership structures, produces portfolio-optimized staffing recommendations, and learns from past hiring decisions. It operates in three modes:
+NEXUS stress-tests organizational leadership structures, produces portfolio-optimized staffing recommendations, and learns from past hiring decisions. It operates in four modes:
 
-- **DIAGNOSE** — Stress-test leadership against crisis scenarios. Identify vulnerabilities and model cascade impacts.
-- **STAFF** — Fill leadership gaps with scenario-adaptive, team-chemistry-aware, portfolio-optimized recommendations.
+- **DIAGNOSE** — Stress-test leadership against crisis scenarios. Identify vulnerabilities and model cascade impacts. Auto-suggests the most relevant scenarios based on industry context.
+- **STAFF** — Fill leadership gaps with scenario-adaptive, team-chemistry-aware, portfolio-optimized recommendations. Includes development pathways for internal upskilling candidates.
 - **LEARN** — Replay past hiring decisions, discover systematic biases, and calibrate future recommendations.
+- **WHAT-IF** — Ask natural-language questions ("What happens if our VP leaves during the battery crisis?") and get a chained DIAGNOSE → STAFF → Brief response in one shot.
 
 ## Architecture
 
@@ -17,6 +18,7 @@ NEXUS stress-tests organizational leadership structures, produces portfolio-opti
 - **Database:** Supabase (managed PostgreSQL + pgvector for RAG)
 - **LLM:** Gemini 2.5 Flash (agents) + Gemini 2.5 Pro (executive briefs)
 - **Frontend:** React / Recharts / Supabase JS client
+- **Key Features:** Conversational what-if, bias mirror toggle, scenario auto-suggest, development pathways
 - **Data:** 100% synthetic. GDPR-compliant by design.
 
 ## Quick Start
