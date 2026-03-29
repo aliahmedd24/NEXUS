@@ -61,6 +61,8 @@ def fetch_one(table: str, id: str) -> dict | None:
     """
     sb = get_supabase()
     result = sb.table(table).select("*").eq("id", id).maybe_single().execute()
+    if result is None:
+        return None
     return result.data
 
 
