@@ -103,6 +103,8 @@ def scan_vulnerabilities(scenario_id: str) -> dict:
     ]
 
     results = []
+    raw_leader_genomes: dict[str, dict] = {}
+
     for role in critical_roles:
         if role.get("current_holder_id"):
             scores = fetch_by_column(
@@ -133,11 +135,27 @@ def scan_vulnerabilities(scenario_id: str) -> dict:
             )
             leader = fetch_one("leaders", role["current_holder_id"])
             leader_name = leader["full_name"] if leader else "Unknown"
+
+            # Collect raw genome data for LLM analysis
+            reviews = fetch_by_column("performance_reviews", "leader_id", role["current_holder_id"])
+            feedback = fetch_by_column("feedback_360", "leader_id", role["current_holder_id"])
+            raw_leader_genomes[role["id"]] = {
+                "leader_name": leader_name,
+                "genome": genome,
+                "reviews_count": len(reviews),
+                "feedback_count": len(feedback),
+            }
         else:
             gap_score = 1.0
             status = "red"
             gap_dimensions = {dim: demand for dim, demand in demand_vector.items()}
             leader_name = None
+            raw_leader_genomes[role["id"]] = {
+                "leader_name": None,
+                "genome": {},
+                "reviews_count": 0,
+                "feedback_count": 0,
+            }
 
         results.append(
             {
@@ -165,6 +183,11 @@ def scan_vulnerabilities(scenario_id: str) -> dict:
         "warning_count": warning,
         "covered_count": covered,
         "aggregate_resilience_score": resilience,
+        # Raw data for LLM-driven analysis — the agent uses these to form
+        # its OWN assessment rather than just narrating the mechanical scores.
+        "_raw_demand_vector": demand_vector,
+        "_raw_leader_genomes": raw_leader_genomes,
+        "_raw_scenario_narrative": scenario.get("narrative", ""),
     }
 
 
@@ -224,8 +247,17 @@ def compute_cascade_impact(role_id: str, scenario_id: str) -> dict:
         "scenario_name": scenario["name"],
         "cascade_direction": "upstream (leaf node — units that depend on this unit)" if is_leaf else "downstream",
         "cascade_chain": chain,
-        "total_impact_eur": sum(n.get("estimated_cost_eur", 0) for n in chain),
+        "mechanical_total_eur": sum(n.get("mechanical_cost_eur", 0) for n in chain),
         "optimal_intervention": intervention,
+        # Raw data for LLM-driven cascade analysis — the agent uses these
+        # to reason about impact magnitudes rather than relying on hardcoded
+        # EUR multipliers in the chain nodes.
+        "_raw_dependency_graph": dependencies,
+        "_raw_org_unit_names": org_units,
+        "_raw_scenario_probability": scenario.get("probability", 0.5),
+        "_raw_scenario_narrative": scenario.get("narrative", ""),
+        "_raw_role_gap_score": gap_score,
+        "_raw_affected_org_units": scenario.get("affected_org_units", []),
     }
 
 

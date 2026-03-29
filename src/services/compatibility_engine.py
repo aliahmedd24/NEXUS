@@ -90,7 +90,7 @@ def compute_pairwise_compatibility(
         synergy_score = 0.0
 
     return {
-        "synergy_score": round(synergy_score, 4),
+        "mechanical_synergy_score": round(synergy_score, 4),
         "friction_dimensions": friction_dims,
         "synergy_dimensions": synergy_dims,
         "groupthink_risk": round(groupthink_risk, 4),

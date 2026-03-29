@@ -87,6 +87,29 @@ def _log_event(icon: str, color: str, label: str, detail: str = "") -> None:
     click.echo(f"  {DIM}{ts}{RESET}  {color}{icon} {label}{RESET}{detail_str}", err=True)
 
 
+def _detect_llm_viz_type(data: dict) -> str | None:
+    """Detect which visualization type an LLM structured output maps to.
+
+    Returns the viz type string if the output matches a known schema, else None.
+    The LLM output contains REASONED values (not mechanical formula outputs).
+    """
+    if "heatmap" in data and "aggregate_resilience_score" in data:
+        return "diagnose_heatmap_llm"
+    if "cascade_chain" in data and "total_exposure_eur" in data:
+        return "diagnose_cascade_llm"
+    if "ranked_candidates" in data and "org_unit_id" in data:
+        return "staff_ranking_llm"
+    if "pairwise_assessments" in data and "overall_team_fit" in data:
+        return "staff_chemistry_llm"
+    if "staffing_recommendations" in data:
+        return "staff_plan_llm"
+    if "replays" in data and "overall_decision_quality" in data:
+        return "learn_replay_llm"
+    if "bias_mirror" in data and "success_dna" in data:
+        return "learn_biases_llm"
+    return None
+
+
 def _summarize_json_response(text: str, author: str) -> str | None:
     """If text is structured JSON from an output_schema agent, return a human summary.
 
@@ -135,9 +158,9 @@ def _summarize_json_response(text: str, author: str) -> str | None:
                 lines.append(f"• {a}")
 
     # ── DIAGNOSE: Cascade Report ─────────────────────────────────────
-    elif "cascade_chain" in data and ("total_exposure_eur" in data or "total_impact_eur" in data):
+    elif "cascade_chain" in data and ("total_exposure_eur" in data or "total_impact_eur" in data or "mechanical_total_eur" in data):
         trigger = data.get("trigger_role") or data.get("role_title") or data.get("trigger_scenario") or "trigger"
-        exposure = data.get("total_exposure_eur") or data.get("total_impact_eur", 0)
+        exposure = data.get("total_exposure_eur") or data.get("total_impact_eur") or data.get("mechanical_total_eur", 0)
         chain = data.get("cascade_chain", [])
         lines.append(f"**Cascade impact analysis from {trigger}.**")
         lines.append(f"Total exposure: **€{exposure:,.0f}** across {len(chain)} downstream units.")
@@ -435,6 +458,28 @@ async def send_message(request: ChatRequest):
                                     f"SUMMARIZED [{event.author}]",
                                     display_text[:150].replace("\n", " "),
                                 )
+
+                                # Emit LLM-reasoned output as visualization event
+                                # so frontend can show LLM analysis overlaid on
+                                # mechanical tool data
+                                try:
+                                    llm_data = json.loads(part.text)
+                                    if isinstance(llm_data, dict):
+                                        llm_viz_type = _detect_llm_viz_type(llm_data)
+                                        if llm_viz_type:
+                                            _log_event(
+                                                "🧠",
+                                                MAGENTA,
+                                                f"LLM VIZ [{event.author}]",
+                                                llm_viz_type,
+                                            )
+                                            yield _sse("visualization", {
+                                                "type": llm_viz_type,
+                                                "tool": f"llm:{event.author}",
+                                                "data": llm_data,
+                                            })
+                                except (json.JSONDecodeError, ValueError):
+                                    pass
                             else:
                                 text_preview = part.text[:150].replace("\n", " ")
                                 marker = f" {GREEN}[FINAL]{RESET}" if is_final else ""

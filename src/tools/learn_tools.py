@@ -250,6 +250,16 @@ def simulate_counterfactual(
         else "critical_miss"
     )
 
+    # Get selected candidate genome for comparison
+    selected_scores = fetch_by_column(
+        "leader_capability_scores", "leader_id", decision["selected_candidate_id"],
+    )
+    selected_genome = {
+        s["dimension"]: s.get("corrected_score") or s.get("raw_score", 0.5)
+        for s in selected_scores
+        if s.get("assessor_type") == "composite"
+    }
+
     alt_leader = fetch_one("leaders", alternative_candidate_id)
     return {
         "decision_id": decision_id,
@@ -259,8 +269,17 @@ def simulate_counterfactual(
         ),
         "predicted_fit_score": round(alt_fit, 3),
         "actual_quality_of_hire": round(actual_qoh, 3),
-        "divergence_score": divergence,
-        "divergence_category": category,
+        "mechanical_divergence_score": divergence,
+        "mechanical_divergence_category": category,
+        # Raw data for LLM-driven counterfactual analysis
+        "_raw_alt_genome": alt_genome,
+        "_raw_selected_genome": selected_genome,
+        "_raw_role_requirements": required,
+        "_raw_actual_outcomes": actual_outcomes,
+        "_raw_decision_context": {
+            "scenario_at_decision": decision.get("scenario_at_decision", ""),
+            "decision_reasoning": decision.get("decision_reasoning", ""),
+        },
     }
 
 

@@ -175,7 +175,7 @@ function addDiagnoseSheets(wb: ExcelJS.Workbook, items: ArtifactItem[]) {
   if (cascadeData) {
     const sheet = wb.addWorksheet('Cascade Impact');
     const chain = (cascadeData as { cascade_chain?: unknown[] }).cascade_chain || [];
-    const totalImpact = (cascadeData as { total_impact_eur?: number }).total_impact_eur;
+    const totalImpact = (cascadeData as { mechanical_total_eur?: number }).mechanical_total_eur;
     const trigger = (cascadeData as { role_title?: string }).role_title || '';
 
     sheet.getCell('A1').value = 'Trigger Role';
@@ -204,7 +204,7 @@ function addDiagnoseSheets(wb: ExcelJS.Workbook, items: ArtifactItem[]) {
         Number(node.impact_score ?? 0).toFixed(3),
         node.dependency_type || '',
         Number(node.coupling_strength ?? 0).toFixed(2),
-        formatEUR(Number(node.estimated_cost_eur ?? 0)),
+        formatEUR(Number(node.mechanical_cost_eur ?? 0)),
         node.estimated_delay_days ?? 0,
       ]);
     }
@@ -245,7 +245,7 @@ function addStaffSheets(wb: ExcelJS.Workbook, items: ArtifactItem[]) {
         i + 1,
         c.full_name || '',
         c.leader_type || '',
-        formatScoreRaw(Number(c.overall_fit_score ?? 0)),
+        formatScoreRaw(Number(c.mechanical_fit_score ?? 0)),
         c.calibration_applied ? 'Yes' : 'No',
         strengths[0]?.dimension ? formatDimension(strengths[0].dimension) : '',
         gaps[0]?.dimension ? formatDimension(gaps[0].dimension) : '',
@@ -253,7 +253,7 @@ function addStaffSheets(wb: ExcelJS.Workbook, items: ArtifactItem[]) {
 
       // Color fit score
       const fitCell = row.getCell(4);
-      const fitVal = Number(c.overall_fit_score ?? 0);
+      const fitVal = Number(c.mechanical_fit_score ?? 0);
       if (fitVal >= 0.7) fitCell.font = { color: { argb: 'FF10B981' }, bold: true };
       else if (fitVal >= 0.5) fitCell.font = { color: { argb: 'FFF59E0B' }, bold: true };
       else fitCell.font = { color: { argb: 'FFEF4444' }, bold: true };
@@ -331,13 +331,13 @@ function addStaffSheets(wb: ExcelJS.Workbook, items: ArtifactItem[]) {
       const row = sheet.addRow([
         a.team_member_name || '',
         a.role_title || '',
-        formatScoreRaw(Number(a.synergy_score ?? 0)),
+        formatScoreRaw(Number(a.mechanical_synergy_score ?? 0)),
         synergyDims.map(formatDimension).join(', '),
         frictionDims.map(formatDimension).join(', '),
       ]);
 
       const scoreCell = row.getCell(3);
-      const sv = Number(a.synergy_score ?? 0);
+      const sv = Number(a.mechanical_synergy_score ?? 0);
       if (sv >= 0.3) scoreCell.font = { color: { argb: 'FF10B981' }, bold: true };
       else if (sv >= 0) scoreCell.font = { color: { argb: 'FF64748B' } };
       else scoreCell.font = { color: { argb: 'FFEF4444' }, bold: true };
@@ -377,7 +377,7 @@ function addStaffSheets(wb: ExcelJS.Workbook, items: ArtifactItem[]) {
         item.recommended_candidate || '',
         String(item.sourcing_strategy || '').replace(/_/g, ' '),
         formatScoreRaw(Number(item.fit_score ?? 0)),
-        formatEUR(Number(item.estimated_cost_eur ?? 0)),
+        formatEUR(Number(item.mechanical_cost_eur ?? item.estimated_cost_eur ?? 0)),
       ]);
     }
 

@@ -39,6 +39,14 @@ export const VIZ_TYPE_LABELS: Record<string, string> = {
   learn_counterfactual: 'Counterfactual Simulation',
   learn_calibration: 'Calibration Coefficients',
   learn_calibration_updated: 'Updated Calibration',
+  // LLM-reasoned analysis overlays (dynamic visualizations)
+  diagnose_heatmap_llm: 'LLM Vulnerability Assessment',
+  diagnose_cascade_llm: 'LLM Cascade Analysis',
+  staff_ranking_llm: 'LLM Candidate Assessment',
+  staff_chemistry_llm: 'LLM Team Dynamics Assessment',
+  staff_plan_llm: 'LLM Staffing Recommendation',
+  learn_replay_llm: 'LLM Decision Replay Analysis',
+  learn_biases_llm: 'LLM Bias Assessment',
 };
 
 /** Map viz types back to their pipeline mode. */
@@ -58,4 +66,12 @@ export const VIZ_TYPE_TO_MODE: Record<string, Mode> = {
   learn_counterfactual: 'learn',
   learn_calibration: 'learn',
   learn_calibration_updated: 'learn',
+  // LLM analysis overlays
+  diagnose_heatmap_llm: 'diagnose',
+  diagnose_cascade_llm: 'diagnose',
+  staff_ranking_llm: 'staff',
+  staff_chemistry_llm: 'staff',
+  staff_plan_llm: 'staff',
+  learn_replay_llm: 'learn',
+  learn_biases_llm: 'learn',
 };

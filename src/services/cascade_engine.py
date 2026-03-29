@@ -151,25 +151,25 @@ def quantify_impact(
 
     if dependency_type == "production_flow":
         return {
-            "estimated_cost_eur": round(impact * 500_000, 2),
+            "mechanical_cost_eur": round(impact * 500_000, 2),
             "estimated_delay_days": 0,
             "units_affected": round(impact * 1000),
         }
     elif dependency_type == "quality_gate":
         return {
-            "estimated_cost_eur": round(impact * 200_000, 2),
+            "mechanical_cost_eur": round(impact * 200_000, 2),
             "estimated_delay_days": round(impact * 14),
             "units_affected": 0,
         }
     elif dependency_type == "supply_chain":
         return {
-            "estimated_cost_eur": round(impact * 300_000, 2),
+            "mechanical_cost_eur": round(impact * 300_000, 2),
             "estimated_delay_days": round(impact * 21),
             "units_affected": round(impact * 500),
         }
     else:
         return {
-            "estimated_cost_eur": round(impact * 100_000, 2),
+            "mechanical_cost_eur": round(impact * 100_000, 2),
             "estimated_delay_days": round(impact * 7),
             "units_affected": 0,
         }

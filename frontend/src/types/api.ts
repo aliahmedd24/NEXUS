@@ -25,7 +25,7 @@ export interface CascadeNode {
   impact_score: number;
   dependency_type: string;
   coupling_strength: number;
-  estimated_cost_eur: number;
+  mechanical_cost_eur: number;
   estimated_delay_days: number;
 }
 
@@ -34,7 +34,7 @@ export interface CascadeReport {
   scenario_name: string;
   cascade_direction: string;
   cascade_chain: CascadeNode[];
-  total_impact_eur: number;
+  mechanical_total_eur: number;
   optimal_intervention: {
     org_unit_id: string;
     impact_blocked_pct: number;
@@ -75,7 +75,7 @@ export interface CandidateFit {
   full_name: string;
   leader_type: string;
   role_type: string;
-  overall_fit_score: number;
+  mechanical_fit_score: number;
   dimension_fits: Record<string, number>;
   strengths: { dimension: string; fit: number }[];
   gaps: { dimension: string; fit: number }[];
@@ -93,7 +93,7 @@ export interface PairwiseAssessment {
   team_member_id: string;
   team_member_name: string;
   role_title: string;
-  synergy_score: number;
+  mechanical_synergy_score: number;
   friction_dimensions: string[];
   synergy_dimensions: string[];
 }
@@ -104,7 +104,7 @@ export interface TeamChemistry {
   org_unit_id: string;
   pairwise_assessments: PairwiseAssessment[];
   team_member_count: number;
-  average_synergy: number;
+  mechanical_avg_synergy: number;
   team_balance: {
     composition_score: number;
     diversity_score: number;
@@ -125,7 +125,7 @@ export interface StaffingPlan {
     role_title: string;
     recommended_candidate: string;
     fit_score: number;
-    estimated_cost_eur: number;
+    mechanical_cost_eur: number;
     sourcing_strategy: string;
   }[];
   total_cost_eur: number;

@@ -64,7 +64,7 @@ vulnerability_scanner = LlmAgent(
     output_schema=VulnerabilityReportOutput,
     output_key="vulnerability_report",
     generate_content_config=types.GenerateContentConfig(
-        temperature=0.1,
+        temperature=0.4,
         thinking_config=types.ThinkingConfig(include_thoughts=True),
     ),
     before_tool_callback=_log_tool_call,
@@ -72,7 +72,7 @@ vulnerability_scanner = LlmAgent(
 
 cascade_modeler = LlmAgent(
     name="cascade_modeler",
-    model=settings.gemini_model_fast,
+    model=settings.gemini_model_pro,
     description=(
         "Models downstream cascade impacts when leadership roles fail. Quantifies "
         "business exposure in EUR and identifies optimal intervention points."
@@ -82,7 +82,7 @@ cascade_modeler = LlmAgent(
     output_schema=CascadeReportOutput,
     output_key="cascade_report",
     generate_content_config=types.GenerateContentConfig(
-        temperature=0.2,
+        temperature=0.5,
         thinking_config=types.ThinkingConfig(include_thoughts=True),
     ),
     before_tool_callback=_log_tool_call,

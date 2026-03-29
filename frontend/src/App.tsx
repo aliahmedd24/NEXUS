@@ -35,7 +35,7 @@ function App() {
   const [scenarioName, setScenarioName] = useState('');
   const [calibrated, setCalibrated] = useState(false);
 
-  // Injected visualization data from chat agent
+  // Injected visualization data from chat agent (mechanical tool data)
   const [vizDiagnoseResult, setVizDiagnoseResult] = useState<DiagnoseResult | null>(null);
   const [vizCascade, setVizCascade] = useState<CascadeReport | null>(null);
   const [vizRanking, setVizRanking] = useState<CandidateFit[] | null>(null);
@@ -45,6 +45,12 @@ function App() {
   const [vizDecisions, setVizDecisions] = useState<HistoricalDecision[] | null>(null);
   const [vizBiases, setVizBiases] = useState<BiasPattern | null>(null);
   const [vizReplay, setVizReplay] = useState<DecisionReplay | null>(null);
+
+  // LLM-reasoned analysis overlays (dynamic — may differ from mechanical)
+  const [llmDiagnose, setLlmDiagnose] = useState<Record<string, unknown> | null>(null);
+  const [llmCascade, setLlmCascade] = useState<Record<string, unknown> | null>(null);
+  const [llmRanking, setLlmRanking] = useState<Record<string, unknown> | null>(null);
+  const [llmChemistry, setLlmChemistry] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     loadInitialData();
@@ -159,6 +165,20 @@ function App() {
       case 'learn_calibration_updated':
         // These are informational — agent text explains them
         break;
+
+      // LLM-reasoned analysis overlays
+      case 'diagnose_heatmap_llm':
+        setLlmDiagnose(d);
+        break;
+      case 'diagnose_cascade_llm':
+        setLlmCascade(d);
+        break;
+      case 'staff_ranking_llm':
+        setLlmRanking(d);
+        break;
+      case 'staff_chemistry_llm':
+        setLlmChemistry(d);
+        break;
     }
   }, [addItem]);
 
@@ -198,6 +218,8 @@ function App() {
             compoundScenario={compoundScenario}
             injectedResult={vizDiagnoseResult}
             injectedCascade={vizCascade}
+            llmAnalysis={llmDiagnose}
+            llmCascade={llmCascade}
           />
         )}
         {mode === 'staff' && (
@@ -208,6 +230,8 @@ function App() {
             injectedGenome={vizGenome}
             injectedChemistry={vizChemistry}
             injectedPlan={vizPlan}
+            llmRanking={llmRanking}
+            llmChemistry={llmChemistry}
           />
         )}
         {mode === 'learn' && (

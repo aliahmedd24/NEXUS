@@ -310,14 +310,14 @@ export function StaffPage({ scenarios, roles, injectedRanking, injectedGenome, i
                             overflow: 'hidden',
                           }}>
                             <div style={{
-                              width: `${c.overall_fit_score * 100}%`,
+                              width: `${c.mechanical_fit_score * 100}%`,
                               height: '100%',
                               borderRadius: 3,
-                              background: c.overall_fit_score >= 0.7 ? '#1e88e5' : c.overall_fit_score >= 0.5 ? '#f59e0b' : '#ef4444',
+                              background: c.mechanical_fit_score >= 0.7 ? '#1e88e5' : c.mechanical_fit_score >= 0.5 ? '#f59e0b' : '#ef4444',
                             }} />
                           </div>
                           <span className="text-mono" style={{ fontSize: 11, color: '#f1f5f9' }}>
-                            {c.overall_fit_score.toFixed(2)}
+                            {c.mechanical_fit_score.toFixed(2)}
                           </span>
                         </div>
                       </motion.div>
@@ -508,7 +508,7 @@ export function StaffPage({ scenarios, roles, injectedRanking, injectedGenome, i
                             </td>
                             <td style={{ padding: '6px 4px' }}>
                               <span className="text-mono" style={{ fontSize: 11, color: '#94a3b8' }}>
-                                &euro;{(item.estimated_cost_eur / 1000).toFixed(0)}K
+                                &euro;{(item.mechanical_cost_eur / 1000).toFixed(0)}K
                               </span>
                             </td>
                             <td style={{ padding: '6px 4px' }}>
@@ -535,7 +535,7 @@ export function StaffPage({ scenarios, roles, injectedRanking, injectedGenome, i
 }
 
 function ChemistryCard({ assessment }: { assessment: any }) {
-  const score = assessment.synergy_score;
+  const score = assessment.mechanical_synergy_score;
   const barColor = score >= 0.3 ? '#10b981' : score >= 0 ? '#64748b' : score >= -0.3 ? '#f59e0b' : '#ef4444';
   const barWidth = Math.abs(score) * 100;
 

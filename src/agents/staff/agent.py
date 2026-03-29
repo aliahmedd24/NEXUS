@@ -72,7 +72,7 @@ genome_agent = LlmAgent(
     output_schema=GenomeAnalysisOutput,
     output_key="genome_analysis",
     generate_content_config=types.GenerateContentConfig(
-        temperature=0.1,
+        temperature=0.4,
         thinking_config=types.ThinkingConfig(include_thoughts=True),
     ),
     before_tool_callback=_log_tool_call,
@@ -90,7 +90,7 @@ team_chemistry_agent = LlmAgent(
     output_schema=TeamChemistryOutput,
     output_key="chemistry_report",
     generate_content_config=types.GenerateContentConfig(
-        temperature=0.2,
+        temperature=0.4,
         thinking_config=types.ThinkingConfig(include_thoughts=True),
     ),
     before_tool_callback=_log_tool_call,
@@ -114,7 +114,7 @@ portfolio_optimizer_agent = LlmAgent(
     output_schema=PortfolioOptimizerOutput,
     output_key="staffing_plan",
     generate_content_config=types.GenerateContentConfig(
-        temperature=0.2,
+        temperature=0.3,
         thinking_config=types.ThinkingConfig(include_thoughts=True),
     ),
     before_tool_callback=_log_tool_call,

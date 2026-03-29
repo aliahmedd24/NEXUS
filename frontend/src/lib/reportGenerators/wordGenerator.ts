@@ -134,7 +134,7 @@ function generateExecutiveSummary(group: ArtifactGroup): string {
       const topCandidate = candidates[0];
       const roleType = (ranking as { role_type?: string }).role_type || 'the target role';
       if (topCandidate) {
-        return `Talent analysis for ${roleType} evaluated ${candidates.length} candidates. The top-ranked candidate is ${topCandidate.full_name} with an overall fit score of ${formatScoreRaw(Number(topCandidate.overall_fit_score ?? 0))}. ${topCandidate.calibration_applied ? 'Bias calibration was applied to correct for historical overweighting patterns.' : ''} The following report provides the full ranking, genome profiles, team chemistry analysis, and staffing plan with ROI projections.`;
+        return `Talent analysis for ${roleType} evaluated ${candidates.length} candidates. The top-ranked candidate is ${topCandidate.full_name} with an overall fit score of ${formatScoreRaw(Number(topCandidate.mechanical_fit_score ?? 0))}. ${topCandidate.calibration_applied ? 'Bias calibration was applied to correct for historical overweighting patterns.' : ''} The following report provides the full ranking, genome profiles, team chemistry analysis, and staffing plan with ROI projections.`;
       }
     }
   }
@@ -170,7 +170,7 @@ function generateRecommendations(group: ArtifactGroup): string[] {
     }
     const cascade = findItem(items, 'diagnose_cascade') as Record<string, unknown> | null;
     if (cascade) {
-      const totalCost = Number((cascade as { total_impact_eur?: number }).total_impact_eur ?? 0);
+      const totalCost = Number((cascade as { mechanical_total_eur?: number }).mechanical_total_eur ?? 0);
       if (totalCost > 0) recs.push(`Total cascade exposure of ${formatEUR(totalCost)} identified. Prioritize the optimal intervention point to block downstream propagation.`);
     }
   }
@@ -181,7 +181,7 @@ function generateRecommendations(group: ArtifactGroup): string[] {
       const candidates = ((ranking as { candidates?: unknown[] }).candidates || []) as Record<string, unknown>[];
       if (candidates.length > 0) {
         const top = candidates[0];
-        recs.push(`Proceed with ${top.full_name} (fit: ${formatScoreRaw(Number(top.overall_fit_score ?? 0))}) as the primary candidate. Prepare a structured onboarding plan focused on identified gap dimensions.`);
+        recs.push(`Proceed with ${top.full_name} (fit: ${formatScoreRaw(Number(top.mechanical_fit_score ?? 0))}) as the primary candidate. Prepare a structured onboarding plan focused on identified gap dimensions.`);
       }
       if (candidates.length > 1) {
         recs.push(`Maintain ${candidates[1].full_name} as an active backup candidate in case the primary declines.`);
@@ -189,7 +189,7 @@ function generateRecommendations(group: ArtifactGroup): string[] {
     }
     const chemistry = findItem(items, 'staff_chemistry') as Record<string, unknown> | null;
     if (chemistry) {
-      const avgSynergy = Number((chemistry as { average_synergy?: number }).average_synergy ?? 0);
+      const avgSynergy = Number((chemistry as { mechanical_avg_synergy?: number }).mechanical_avg_synergy ?? 0);
       if (avgSynergy < 0) recs.push(`Team chemistry analysis flags negative average synergy (${formatScoreRaw(avgSynergy)}). Plan targeted team integration activities for the first 90 days.`);
     }
   }
@@ -247,7 +247,7 @@ function buildDiagnoseSections(items: ArtifactItem[]): (Paragraph | Table)[] {
   if (cascadeData) {
     result.push(heading('Cascade Impact Analysis'));
     const trigger = (cascadeData as { role_title?: string }).role_title || '';
-    const totalImpact = Number((cascadeData as { total_impact_eur?: number }).total_impact_eur ?? 0);
+    const totalImpact = Number((cascadeData as { mechanical_total_eur?: number }).mechanical_total_eur ?? 0);
     result.push(bodyText(`Trigger: ${trigger}  |  Total Exposure: ${formatEUR(totalImpact)}`, { bold: true }));
 
     const chain = ((cascadeData as { cascade_chain?: unknown[] }).cascade_chain || []) as Record<string, unknown>[];
@@ -261,7 +261,7 @@ function buildDiagnoseSections(items: ArtifactItem[]): (Paragraph | Table)[] {
           ...chain.map(node => new TableRow({ children: [
             dataCell(String(node.org_unit_name || '')),
             dataCell(formatScoreRaw(Number(node.impact_score ?? 0))),
-            dataCell(formatEUR(Number(node.estimated_cost_eur ?? 0))),
+            dataCell(formatEUR(Number(node.mechanical_cost_eur ?? 0))),
             dataCell(`${node.estimated_delay_days ?? 0} days`),
           ]})),
         ],
@@ -292,7 +292,7 @@ function buildStaffSections(items: ArtifactItem[]): (Paragraph | Table)[] {
             headerCell('#'), headerCell('Name'), headerCell('Type'), headerCell('Fit Score'),
           ]}),
           ...candidates.map((c, i) => {
-            const fit = Number(c.overall_fit_score ?? 0);
+            const fit = Number(c.mechanical_fit_score ?? 0);
             const fitColor = fit >= 0.7 ? WORD_COLORS.success : fit >= 0.5 ? WORD_COLORS.warning : WORD_COLORS.critical;
             return new TableRow({ children: [
               dataCell(String(i + 1)),
@@ -334,7 +334,7 @@ function buildStaffSections(items: ArtifactItem[]): (Paragraph | Table)[] {
   if (chemistryData) {
     result.push(heading('Team Chemistry'));
     const assessments = ((chemistryData as { pairwise_assessments?: unknown[] }).pairwise_assessments || []) as Record<string, unknown>[];
-    result.push(bodyText(`Average synergy: ${formatScoreRaw(Number((chemistryData as { average_synergy?: number }).average_synergy ?? 0))}`, { bold: true }));
+    result.push(bodyText(`Average synergy: ${formatScoreRaw(Number((chemistryData as { mechanical_avg_synergy?: number }).mechanical_avg_synergy ?? 0))}`, { bold: true }));
 
     if (assessments.length > 0) {
       result.push(new Table({
@@ -344,7 +344,7 @@ function buildStaffSections(items: ArtifactItem[]): (Paragraph | Table)[] {
             headerCell('Team Member'), headerCell('Synergy'), headerCell('Key Dynamics'),
           ]}),
           ...assessments.map(a => {
-            const sv = Number(a.synergy_score ?? 0);
+            const sv = Number(a.mechanical_synergy_score ?? 0);
             const color = sv >= 0.3 ? WORD_COLORS.success : sv < 0 ? WORD_COLORS.critical : WORD_COLORS.textMuted;
             const synergyDims = (a.synergy_dimensions as string[]) || [];
             const frictionDims = (a.friction_dimensions as string[]) || [];

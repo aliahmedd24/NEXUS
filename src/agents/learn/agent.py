@@ -45,7 +45,7 @@ decision_replay_agent = LlmAgent(
     output_schema=ReplayAnalysisOutput,
     output_key="replay_analysis",
     generate_content_config=types.GenerateContentConfig(
-        temperature=0.1,
+        temperature=0.3,
         thinking_config=types.ThinkingConfig(include_thoughts=True),
     ),
 )

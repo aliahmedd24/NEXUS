@@ -165,6 +165,9 @@ def adapt_jd_to_scenario(role_type: str, scenario_id: str) -> dict:
         "adapted_weightings": adapted,
         "changes": changes,
         "scenario_name": scenario["name"],
+        # Raw data for LLM-driven JD analysis
+        "_raw_scenario_narrative": scenario.get("narrative", ""),
+        "_raw_scenario_demands": scenario["capability_demand_vector"],
     }
 
 
@@ -437,7 +440,7 @@ def compute_candidate_fit(
     return {
         "leader_id": leader_id,
         "role_type": role_type,
-        "overall_fit_score": round(fit_score, 3),
+        "mechanical_fit_score": round(fit_score, 3),
         "dimension_fits": dimension_fits,
         "strengths": strengths,
         "gaps": gaps,
@@ -470,16 +473,42 @@ def rank_candidates(role_type: str, scenario_id: str = "") -> dict:
             fit["leader_type"] = candidate["leader_type"]
             rankings.append(fit)
 
-    rankings.sort(key=lambda x: x["overall_fit_score"], reverse=True)
+    rankings.sort(key=lambda x: x["mechanical_fit_score"], reverse=True)
 
     # Include org_unit_id for the target role so downstream agents can use it
     roles = fetch_by_column("roles", "title", role_type)
     org_unit_id = roles[0]["org_unit_id"] if roles else None
 
+    # Collect raw genomes for LLM-driven analysis
+    raw_genomes: dict[str, dict] = {}
+    for candidate in pool:
+        scores = fetch_by_column("leader_capability_scores", "leader_id", candidate["id"])
+        raw_genomes[candidate["id"]] = {
+            s["dimension"]: s.get("corrected_score") or s.get("raw_score", 0.5)
+            for s in scores
+            if s.get("assessor_type") == "composite"
+        }
+
+    # Get required profile for LLM context
+    templates = fetch_by_column("jd_templates", "role_type", role_type)
+    raw_required = templates[0]["competency_weightings"] if templates else {}
+
+    # Get calibration coefficients
+    calibration_rows = fetch_all("calibration_coefficients")
+    raw_calibration = (
+        {r["dimension"]: r["correction_factor"] for r in calibration_rows}
+        if calibration_rows
+        else {}
+    )
+
     return {
         "org_unit_id": org_unit_id,
         "role_type": role_type,
         "candidates": rankings,
+        # Raw data for LLM-driven ranking analysis
+        "_raw_genomes": raw_genomes,
+        "_raw_required_profile": raw_required,
+        "_raw_calibration": raw_calibration,
     }
 
 
@@ -616,7 +645,7 @@ def compute_team_compatibility(
 
     # Overall compatibility score
     avg_synergy = (
-        sum(p["synergy_score"] for p in pairwise) / len(pairwise)
+        sum(p["mechanical_synergy_score"] for p in pairwise) / len(pairwise)
         if pairwise
         else 0.0
     )
@@ -627,8 +656,15 @@ def compute_team_compatibility(
         "org_unit_id": org_unit_id,
         "pairwise_assessments": pairwise,
         "team_member_count": len(team),
-        "average_synergy": round(avg_synergy, 4),
+        "mechanical_avg_synergy": round(avg_synergy, 4),
         "team_balance": balance,
+        # Raw data for LLM-driven chemistry analysis
+        "_raw_interaction_rules": rules,
+        "_raw_candidate_genome": candidate_genome,
+        "_raw_team_genomes": [
+            {"name": m["full_name"], "role": m["role_title"], "genome": m["genome"]}
+            for m in team
+        ],
     }
 
 
@@ -678,8 +714,8 @@ def evaluate_sourcing_options(role_id: str) -> dict:
     best_internal = None
     for leader in internal_current + internal_candidates:
         fit = compute_candidate_fit(leader["id"], role_type)
-        if "error" not in fit and fit["overall_fit_score"] > best_internal_score:
-            best_internal_score = fit["overall_fit_score"]
+        if "error" not in fit and fit["mechanical_fit_score"] > best_internal_score:
+            best_internal_score = fit["mechanical_fit_score"]
             best_internal = leader
 
     if best_internal:
@@ -687,7 +723,7 @@ def evaluate_sourcing_options(role_id: str) -> dict:
             "strategy": "INTERNAL_PROMOTE",
             "candidate": best_internal["full_name"],
             "fit_score": round(best_internal_score, 3),
-            "estimated_cost_eur": 50_000,
+            "mechanical_cost_eur": 50_000,
             "estimated_time_days": 30,
             "risk_level": "low",
         })
@@ -697,8 +733,8 @@ def evaluate_sourcing_options(role_id: str) -> dict:
     best_external = None
     for leader in external_candidates:
         fit = compute_candidate_fit(leader["id"], role_type)
-        if "error" not in fit and fit["overall_fit_score"] > best_external_score:
-            best_external_score = fit["overall_fit_score"]
+        if "error" not in fit and fit["mechanical_fit_score"] > best_external_score:
+            best_external_score = fit["mechanical_fit_score"]
             best_external = leader
 
     if best_external:
@@ -706,7 +742,7 @@ def evaluate_sourcing_options(role_id: str) -> dict:
             "strategy": "EXTERNAL_HIRE",
             "candidate": best_external["full_name"],
             "fit_score": round(best_external_score, 3),
-            "estimated_cost_eur": 180_000,
+            "mechanical_cost_eur": 180_000,
             "estimated_time_days": 120,
             "risk_level": "medium",
         })
@@ -716,9 +752,9 @@ def evaluate_sourcing_options(role_id: str) -> dict:
     best_develop_score = 0.0
     for leader in internal_candidates:
         fit = compute_candidate_fit(leader["id"], role_type)
-        if "error" not in fit and 0.5 <= fit["overall_fit_score"] < 0.85:
-            if fit["overall_fit_score"] > best_develop_score:
-                best_develop_score = fit["overall_fit_score"]
+        if "error" not in fit and 0.5 <= fit["mechanical_fit_score"] < 0.85:
+            if fit["mechanical_fit_score"] > best_develop_score:
+                best_develop_score = fit["mechanical_fit_score"]
                 best_develop = leader
 
     if best_develop:
@@ -726,7 +762,7 @@ def evaluate_sourcing_options(role_id: str) -> dict:
             "strategy": "INTERNAL_DEVELOP",
             "candidate": best_develop["full_name"],
             "fit_score": round(best_develop_score, 3),
-            "estimated_cost_eur": 120_000,
+            "mechanical_cost_eur": 120_000,
             "estimated_time_days": 270,
             "risk_level": "medium",
         })
@@ -736,7 +772,7 @@ def evaluate_sourcing_options(role_id: str) -> dict:
         "strategy": "INTERIM",
         "candidate": None,
         "fit_score": 0.0,
-        "estimated_cost_eur": 250_000,
+        "mechanical_cost_eur": 250_000,
         "estimated_time_days": 14,
         "risk_level": "high",
     })
@@ -746,7 +782,7 @@ def evaluate_sourcing_options(role_id: str) -> dict:
         "strategy": "ACCEPT_RISK",
         "candidate": None,
         "fit_score": 0.0,
-        "estimated_cost_eur": 0,
+        "mechanical_cost_eur": 0,
         "estimated_time_days": 0,
         "risk_level": "critical",
     })
@@ -755,6 +791,10 @@ def evaluate_sourcing_options(role_id: str) -> dict:
         "role_id": role_id,
         "role_title": role["title"],
         "options": options,
+        # Raw data for LLM-driven sourcing analysis
+        "_raw_internal_count": len(internal_current) + len(internal_candidates),
+        "_raw_external_count": len(external_candidates),
+        "_raw_role_criticality": role.get("criticality", "unknown"),
     }
 
 
@@ -807,7 +847,7 @@ def generate_staffing_plan(
             cands.append({
                 "candidate_id": r["leader_id"],
                 "name": r["full_name"],
-                "fit_score": r["overall_fit_score"],
+                "fit_score": r["mechanical_fit_score"],
                 "cost_eur": cost,
             })
         candidates_per_role[role_id] = cands
@@ -820,7 +860,7 @@ def generate_staffing_plan(
                 "role_title": role["title"],
                 "recommended_candidate": best["name"],
                 "fit_score": best["fit_score"],
-                "estimated_cost_eur": best["cost_eur"],
+                "mechanical_cost_eur": best["cost_eur"],
                 "sourcing_strategy": (
                     "EXTERNAL_HIRE"
                     if any(
@@ -845,7 +885,7 @@ def generate_staffing_plan(
     # ROI estimate using cascade impacts as proxy
     roi = compute_roi_estimate(
         {"items": plan_items, "total_cost_eur": total_cost},
-        [{"estimated_cost_eur": total_cost * 5}],  # Assume 5x risk avoidance
+        [{"mechanical_cost_eur": total_cost * 5}],  # Assume 5x risk avoidance
     )
 
     return {

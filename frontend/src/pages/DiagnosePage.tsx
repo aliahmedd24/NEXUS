@@ -12,6 +12,8 @@ interface Props {
   compoundScenario?: any;
   injectedResult?: DiagnoseResult | null;
   injectedCascade?: CascadeReport | null;
+  llmAnalysis?: Record<string, unknown> | null;
+  llmCascade?: Record<string, unknown> | null;
 }
 
 function getGapCellColor(gap: number): string {
@@ -41,7 +43,7 @@ function statusBadge(status: string) {
   );
 }
 
-export function DiagnosePage({ scenarios, onResultReady, compoundScenario, injectedResult, injectedCascade }: Props) {
+export function DiagnosePage({ scenarios, onResultReady, compoundScenario, injectedResult, injectedCascade, llmAnalysis, llmCascade }: Props) {
   const [selectedScenario, setSelectedScenario] = useState('');
   const [result, setResult] = useState<DiagnoseResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -116,6 +118,23 @@ export function DiagnosePage({ scenarios, onResultReady, compoundScenario, injec
       const order = { red: 0, yellow: 1, green: 2 };
       return (order[a.status] ?? 1) - (order[b.status] ?? 1);
     }) || [];
+
+  // Build LLM overlay lookup: role_id → LLM-assessed cell data
+  const llmCellMap = new Map<string, { gap_score: number; status: string }>();
+  const llmResilience = llmAnalysis
+    ? Number((llmAnalysis as Record<string, unknown>).aggregate_resilience_score ?? 0)
+    : null;
+  if (llmAnalysis && Array.isArray((llmAnalysis as Record<string, unknown>).heatmap)) {
+    for (const cell of (llmAnalysis as Record<string, unknown>).heatmap as Array<Record<string, unknown>>) {
+      if (cell.role_id) {
+        llmCellMap.set(String(cell.role_id), {
+          gap_score: Number(cell.gap_score ?? 0),
+          status: String(cell.status ?? ''),
+        });
+      }
+    }
+  }
+  const hasLlmOverlay = llmCellMap.size > 0;
 
   // Suggested scenarios (top 3 by probability)
   const suggested = [...scenarios].sort((a, b) => b.probability - a.probability).slice(0, 3);
@@ -254,9 +273,20 @@ export function DiagnosePage({ scenarios, onResultReady, compoundScenario, injec
                   {result.scenario_name}
                   <span style={{ margin: '0 8px', color: 'rgba(255,255,255,0.1)' }}>|</span>
                   Resilience: <span className="text-mono" style={{
-                    color: result.aggregate_resilience_score >= 0.7 ? '#10b981' :
-                           result.aggregate_resilience_score >= 0.5 ? '#f59e0b' : '#ef4444'
-                  }}>{result.aggregate_resilience_score.toFixed(2)}</span>
+                    color: (llmResilience ?? result.aggregate_resilience_score) >= 0.7 ? '#10b981' :
+                           (llmResilience ?? result.aggregate_resilience_score) >= 0.5 ? '#f59e0b' : '#ef4444'
+                  }}>
+                    {llmResilience != null ? (
+                      <>
+                        {llmResilience.toFixed(2)}
+                        {Math.abs(llmResilience - result.aggregate_resilience_score) > 0.01 && (
+                          <span style={{ fontSize: 10, color: '#a78bfa', marginLeft: 4 }} title="LLM adjusted from mechanical score">
+                            (was {result.aggregate_resilience_score.toFixed(2)})
+                          </span>
+                        )}
+                      </>
+                    ) : result.aggregate_resilience_score.toFixed(2)}
+                  </span>
                   <span style={{ margin: '0 8px', color: 'rgba(255,255,255,0.1)' }}>|</span>
                   <span style={{ color: '#ef4444' }}>{result.critical_count} Critical</span>
                 </div>
@@ -338,21 +368,57 @@ export function DiagnosePage({ scenarios, onResultReady, compoundScenario, injec
                             );
                           })}
                           <td style={tdStyle}>
-                            <span className="text-mono" style={{
-                              color: getGapCellColor(cell.gap_score),
-                              fontWeight: 600,
-                              fontSize: 13,
-                            }}>
-                              {cell.gap_score.toFixed(2)}
-                              {changed && prevCell && (
-                                <span style={{ color: '#ef4444', fontSize: 10, marginLeft: 4 }}>
-                                  {cell.gap_score > prevCell.gap_score ? '↑' : '↓'}
+                            {(() => {
+                              const llmCell = llmCellMap.get(cell.role_id);
+                              const displayGap = llmCell ? llmCell.gap_score : cell.gap_score;
+                              const delta = llmCell ? llmCell.gap_score - cell.gap_score : 0;
+                              return (
+                                <span className="text-mono" style={{
+                                  color: getGapCellColor(displayGap),
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                }}>
+                                  {displayGap.toFixed(2)}
+                                  {llmCell && Math.abs(delta) > 0.01 && (
+                                    <span style={{
+                                      color: '#a78bfa',
+                                      fontSize: 9,
+                                      marginLeft: 3,
+                                    }} title={`LLM adjusted from ${cell.gap_score.toFixed(2)}`}>
+                                      {delta > 0 ? '+' : ''}{delta.toFixed(2)}
+                                    </span>
+                                  )}
+                                  {!llmCell && changed && prevCell && (
+                                    <span style={{ color: '#ef4444', fontSize: 10, marginLeft: 4 }}>
+                                      {cell.gap_score > prevCell.gap_score ? '\u2191' : '\u2193'}
+                                    </span>
+                                  )}
                                 </span>
-                              )}
-                            </span>
+                              );
+                            })()}
                           </td>
                           <td style={tdStyle}>
-                            {statusBadge(cell.status)}
+                            {(() => {
+                              const llmCell = llmCellMap.get(cell.role_id);
+                              const displayStatus = llmCell?.status || cell.status;
+                              const statusChanged = llmCell && llmCell.status !== cell.status;
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  {statusBadge(displayStatus)}
+                                  {statusChanged && (
+                                    <span style={{
+                                      font: '600 8px/1 var(--font-mono)',
+                                      color: '#a78bfa',
+                                      padding: '2px 4px',
+                                      borderRadius: 3,
+                                      background: 'rgba(167,139,250,0.1)',
+                                    }} title={`LLM changed from ${cell.status.toUpperCase()}`}>
+                                      AI
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                         </motion.tr>
                       );
@@ -376,7 +442,7 @@ export function DiagnosePage({ scenarios, onResultReady, compoundScenario, injec
                         <div>
                           <span className="text-caption" style={{ color: '#64748b' }}>Total Exposure</span>
                           <div className="score-badge score-badge--critical" style={{ marginTop: 4 }}>
-                            &euro;{(c.total_impact_eur / 1_000_000).toFixed(1)}M
+                            &euro;{(c.mechanical_total_eur / 1_000_000).toFixed(1)}M
                           </div>
                         </div>
                         <div>
@@ -418,7 +484,7 @@ export function DiagnosePage({ scenarios, onResultReady, compoundScenario, injec
 }
 
 function CascadeDetail({ cell, cascade }: { cell: HeatmapCell; cascade: CascadeReport }) {
-  const totalCost = cascade.cascade_chain.reduce((sum, n) => sum + (n.estimated_cost_eur || 0), 0);
+  const totalCost = cascade.cascade_chain.reduce((sum, n) => sum + (n.mechanical_cost_eur || 0), 0);
   const totalDelay = cascade.cascade_chain.reduce((max, n) => Math.max(max, n.estimated_delay_days || 0), 0);
 
   return (
