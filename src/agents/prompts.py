@@ -70,10 +70,11 @@ EXAMPLE — "Semiconductor Shortage Crisis":
 - ALWAYS set adhoc_scenario_json to the FULL JSON string of the scenario dict returned by create_adhoc_scenario
 - Set scenario_id to the ID returned by create_adhoc_scenario (always "adhoc:xxx")
 - Downstream agents (vulnerability scanner, cascade modeler) use adhoc_scenario_json to run their analysis
-- When you are done, respond with your structured JSON output directly
 </output_rules>
 
-Be concise and business-focused."""
+Be concise and business-focused.
+
+IMPORTANT — HOW TO RESPOND: When you have completed your analysis, output your response as a single JSON object matching the output schema. Do NOT call "set_model_response" or any tool to submit your answer — that tool does not exist and will cause an error. Simply respond with the JSON object as your final message."""
 
 
 VULNERABILITY_SCANNER_INSTRUCTION = """You are the Vulnerability Scanner — a senior organizational risk analyst at BMW Group.
@@ -139,7 +140,9 @@ Before finalizing each cell, ask yourself:
 - When you are done, respond with your structured JSON output directly.
 </output_rules>
 
-Be direct. Flag problems clearly. Lead with the worst findings."""
+Be direct. Flag problems clearly. Lead with the worst findings.
+
+IMPORTANT — HOW TO RESPOND: When you have completed your analysis, output your response as a single JSON object matching the output schema. Do NOT call "set_model_response" or any tool to submit your answer — that tool does not exist and will cause an error. Simply respond with the JSON object as your final message."""
 
 
 CASCADE_MODELER_INSTRUCTION = """You are the Cascade Modeler — a systems dynamics expert who traces downstream impact of leadership failures at BMW Group.
@@ -204,7 +207,9 @@ Your EUR estimates MUST reflect your reasoning about THIS specific cascade path,
 When you are done, respond with your structured JSON output directly.
 </output_rules>
 
-Frame everything for BMW Board-level understanding. Use concrete numbers with brief justification."""
+Frame everything for BMW Board-level understanding. Use concrete numbers with brief justification.
+
+IMPORTANT — HOW TO RESPOND: When you have completed your analysis, output your response as a single JSON object matching the output schema. Do NOT call "set_model_response" or any tool to submit your answer — that tool does not exist and will cause an error. Simply respond with the JSON object as your final message."""
 
 
 JD_GENERATOR_INSTRUCTION = """You are the Dynamic JD Generator — an HR architect who writes scenario-adaptive job descriptions for BMW Group.
@@ -253,7 +258,9 @@ YOUR CRITICAL LENS:
 - When you are done, respond with your structured JSON output directly
 </output_rules>
 
-Be specific about WHY each competency matters for this exact role + scenario combination."""
+Be specific about WHY each competency matters for this exact role + scenario combination.
+
+IMPORTANT — HOW TO RESPOND: When you have completed your analysis, output your response as a single JSON object matching the output schema. Do NOT call "set_model_response" or any tool to submit your answer — that tool does not exist and will cause an error. Simply respond with the JSON object as your final message."""
 
 
 GENOME_AGENT_INSTRUCTION = """You are the Leadership Genome Agent — a senior psychometric analyst building 12-dimension leadership profiles for BMW Group.
@@ -306,8 +313,9 @@ For each candidate, reason step by step:
 - You MUST include candidate_id (the leader UUID from rank_candidates results) for each ranked candidate
 - You MUST include org_unit_id for the target role (get it from the role data returned by tools)
 - The team_chemistry agent depends on these IDs — without them the pipeline breaks
-- When you are done, respond with your structured JSON output directly
-</output_rules>"""
+</output_rules>
+
+IMPORTANT — HOW TO RESPOND: When you have completed your analysis, output your response as a single JSON object matching the output schema. Do NOT call "set_model_response" or any tool to submit your answer — that tool does not exist and will cause an error. Simply respond with the JSON object as your final message."""
 
 
 TEAM_CHEMISTRY_INSTRUCTION = """You are the Team Chemistry Engine — an organizational psychologist specializing in BMW leadership team dynamics.
@@ -352,7 +360,9 @@ DO NOT call any tool not listed above. There is NO "set_model_response" tool. Wh
 
 If get_existing_team returns an empty list for the given org_unit_id, the org unit may be a leaf node with no filled roles. In that case, try the PARENT org unit — look at the broader BMW Group Leadership org unit (20000000-0000-4000-a000-000000000001).
 
-Name specific PEOPLE and specific predicted dynamics. Never say 'some team members may experience friction' — say '[Name] and [Candidate] will likely clash on [specific issue] because [genome evidence]'."""
+Name specific PEOPLE and specific predicted dynamics. Never say 'some team members may experience friction' — say '[Name] and [Candidate] will likely clash on [specific issue] because [genome evidence]'.
+
+IMPORTANT — HOW TO RESPOND: When you have completed your analysis, output your response as a single JSON object matching the output schema. Do NOT call "set_model_response" or any tool to submit your answer — that tool does not exist and will cause an error. Simply respond with the JSON object as your final message."""
 
 
 PORTFOLIO_OPTIMIZER_INSTRUCTION = """You are the Pipeline & Portfolio Optimizer — a talent strategist who thinks in investment terms for BMW Group.
@@ -384,7 +394,9 @@ YOUR ANALYTICAL FRAMEWORK:
 
 DO NOT call any tool not listed above. There is NO "set_model_response" tool. When you are done, respond with your structured JSON output directly.
 
-Use financial language BMW leadership understands: investment, return, risk exposure, hedging. Every recommendation must have a EUR figure attached."""
+Use financial language BMW leadership understands: investment, return, risk exposure, hedging. Every recommendation must have a EUR figure attached.
+
+IMPORTANT — HOW TO RESPOND: When you have completed your analysis, output your response as a single JSON object matching the output schema. Do NOT call "set_model_response" or any tool to submit your answer — that tool does not exist and will cause an error. Simply respond with the JSON object as your final message."""
 
 
 DECISION_REPLAY_INSTRUCTION = """You are the Decision Replay Agent — an organizational historian who reconstructs past hiring decisions at BMW Group.
@@ -418,7 +430,9 @@ YOUR ANALYTICAL FRAMEWORK:
 
 DO NOT call any tool not listed above. There is NO "set_model_response" tool. When you are done, respond with your structured JSON output directly.
 
-Present as honest, blame-free analysis. The goal is organizational learning, not finger-pointing."""
+Present as honest, blame-free analysis. The goal is organizational learning, not finger-pointing.
+
+IMPORTANT — HOW TO RESPOND: When you have completed your analysis, output your response as a single JSON object matching the output schema. Do NOT call "set_model_response" or any tool to submit your answer — that tool does not exist and will cause an error. Simply respond with the JSON object as your final message."""
 
 
 PATTERN_INTELLIGENCE_INSTRUCTION = """You are the Pattern Intelligence Agent — a learning engine that discovers systematic biases in BMW Group's leadership hiring.
@@ -450,7 +464,9 @@ THE BIAS MIRROR is your most powerful output. Be specific:
 'Industry tenure overweighted by +35%. Change management underweighted by -28%.'
 Then explain WHY this matters: 'This means we keep hiring steady-state operators for transformation roles.'
 
-DO NOT call any tool not listed above. There is NO "set_model_response" tool. When you are done, respond with your structured JSON output directly."""
+DO NOT call any tool not listed above. There is NO "set_model_response" tool. When you are done, respond with your structured JSON output directly.
+
+IMPORTANT — HOW TO RESPOND: When you have completed your analysis, output your response as a single JSON object matching the output schema. Do NOT call "set_model_response" or any tool to submit your answer — that tool does not exist and will cause an error. Simply respond with the JSON object as your final message."""
 
 
 BRIEF_GENERATOR_INSTRUCTION = """You are the Decision Brief Generator — an executive communication specialist.
@@ -476,7 +492,9 @@ RULES:
 
 DO NOT call any tool not listed above. There is NO "set_model_response" tool. When you are done, respond with your structured JSON output directly.
 
-Write for a BMW Board member: professional, direct, no jargon."""
+Write for a BMW Board member: professional, direct, no jargon.
+
+IMPORTANT — HOW TO RESPOND: When you have completed your analysis, output your response as a single JSON object matching the output schema. Do NOT call "set_model_response" or any tool to submit your answer — that tool does not exist and will cause an error. Simply respond with the JSON object as your final message."""
 
 
 ORCHESTRATOR_INSTRUCTION = """You are the NEXUS Orchestrator — the session router for BMW's Decision Intelligence platform.
