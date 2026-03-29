@@ -17,6 +17,8 @@ interface Props {
   injectedGenome?: LeaderGenome | null;
   injectedChemistry?: TeamChemistry | null;
   injectedPlan?: StaffingPlan | null;
+  llmRanking?: Record<string, unknown> | null;
+  llmChemistry?: Record<string, unknown> | null;
 }
 
 function formatDim(d: string): string {
@@ -43,7 +45,7 @@ function formatDim(d: string): string {
   return short[d] || d.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-export function StaffPage({ scenarios, roles, injectedRanking, injectedGenome, injectedChemistry, injectedPlan }: Props) {
+export function StaffPage({ scenarios, roles, injectedRanking, injectedGenome, injectedChemistry, injectedPlan, llmRanking, llmChemistry }: Props) {
   const [selectedRole, setSelectedRole] = useState('');
   const [selectedScenario, setSelectedScenario] = useState('');
   const [ranking, setRanking] = useState<CandidateFit[]>([]);
@@ -131,6 +133,29 @@ export function StaffPage({ scenarios, roles, injectedRanking, injectedGenome, i
     if (!includeExternal && c.leader_type === 'external_candidate') return false;
     return true;
   });
+
+  // Build LLM overlay lookups
+  const llmFitMap = new Map<string, number>();
+  if (llmRanking && Array.isArray((llmRanking as Record<string, unknown>).ranked_candidates)) {
+    for (const c of (llmRanking as Record<string, unknown>).ranked_candidates as Array<Record<string, unknown>>) {
+      if (c.leader_id && typeof c.overall_fit_score === 'number') {
+        llmFitMap.set(String(c.leader_id), c.overall_fit_score as number);
+      }
+    }
+  }
+
+  const llmSynergyMap = new Map<string, number>();
+  let llmOverallTeamFit: number | null = null;
+  if (llmChemistry && Array.isArray((llmChemistry as Record<string, unknown>).pairwise_assessments)) {
+    for (const p of (llmChemistry as Record<string, unknown>).pairwise_assessments as Array<Record<string, unknown>>) {
+      if (p.team_member_id && typeof p.synergy_score === 'number') {
+        llmSynergyMap.set(String(p.team_member_id), p.synergy_score as number);
+      }
+    }
+    if (typeof (llmChemistry as Record<string, unknown>).overall_team_fit === 'number') {
+      llmOverallTeamFit = (llmChemistry as Record<string, unknown>).overall_team_fit as number;
+    }
+  }
 
   // Build radar data
   const radarData = genome?.dimensions.map(d => ({
@@ -301,25 +326,41 @@ export function StaffPage({ scenarios, roles, injectedRanking, injectedGenome, i
                           </div>
                         </div>
                         {/* Fit bar */}
-                        <div style={{ width: 80, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <div style={{
-                            flex: 1,
-                            height: 6,
-                            borderRadius: 3,
-                            background: 'rgba(255,255,255,0.06)',
-                            overflow: 'hidden',
-                          }}>
-                            <div style={{
-                              width: `${c.mechanical_fit_score * 100}%`,
-                              height: '100%',
-                              borderRadius: 3,
-                              background: c.mechanical_fit_score >= 0.7 ? '#1e88e5' : c.mechanical_fit_score >= 0.5 ? '#f59e0b' : '#ef4444',
-                            }} />
-                          </div>
-                          <span className="text-mono" style={{ fontSize: 11, color: '#f1f5f9' }}>
-                            {c.mechanical_fit_score.toFixed(2)}
-                          </span>
-                        </div>
+                        {(() => {
+                          const llmFit = llmFitMap.get(c.leader_id);
+                          const displayFit = llmFit ?? c.mechanical_fit_score;
+                          const delta = llmFit != null ? llmFit - c.mechanical_fit_score : 0;
+                          return (
+                            <div style={{ width: 90, display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <div style={{
+                                flex: 1,
+                                height: 6,
+                                borderRadius: 3,
+                                background: 'rgba(255,255,255,0.06)',
+                                overflow: 'hidden',
+                                position: 'relative',
+                              }}>
+                                <div style={{
+                                  width: `${displayFit * 100}%`,
+                                  height: '100%',
+                                  borderRadius: 3,
+                                  background: llmFit != null ? '#a78bfa' : (displayFit >= 0.7 ? '#1e88e5' : displayFit >= 0.5 ? '#f59e0b' : '#ef4444'),
+                                }} />
+                              </div>
+                              <span className="text-mono" style={{ fontSize: 11, color: llmFit != null ? '#a78bfa' : '#f1f5f9' }}>
+                                {displayFit.toFixed(2)}
+                              </span>
+                              {llmFit != null && Math.abs(delta) > 0.01 && (
+                                <span className="text-mono" style={{
+                                  fontSize: 9,
+                                  color: '#a78bfa',
+                                }} title={`LLM adjusted from ${c.mechanical_fit_score.toFixed(2)}`}>
+                                  {delta > 0 ? '+' : ''}{delta.toFixed(2)}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </motion.div>
                     );
                   })}
@@ -419,8 +460,28 @@ export function StaffPage({ scenarios, roles, injectedRanking, injectedGenome, i
                 {chemistry?.pairwise_assessments ? (
                   <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8 }}>
                     {chemistry.pairwise_assessments.map(p => (
-                      <ChemistryCard key={p.team_member_id} assessment={p} />
+                      <ChemistryCard key={p.team_member_id} assessment={p} llmSynergy={llmSynergyMap.get(p.team_member_id)} />
                     ))}
+                    {llmOverallTeamFit != null && chemistry.mechanical_avg_synergy != null && (
+                      <div className="nexus-panel" style={{
+                        padding: '10px 12px',
+                        minWidth: 140,
+                        flexShrink: 0,
+                        borderLeft: '3px solid #a78bfa',
+                      }}>
+                        <div style={{ font: '500 13px/1.3 var(--font-body)', color: '#a78bfa', marginBottom: 4 }}>
+                          AI Team Fit
+                        </div>
+                        <div className="text-mono" style={{ fontSize: 18, color: '#a78bfa', fontWeight: 700 }}>
+                          {llmOverallTeamFit.toFixed(2)}
+                        </div>
+                        {Math.abs(llmOverallTeamFit - chemistry.mechanical_avg_synergy) > 0.01 && (
+                          <div className="text-mono" style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>
+                            was {chemistry.mechanical_avg_synergy.toFixed(2)}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="nexus-panel" style={{ padding: 16, color: '#64748b', font: '400 13px/1.4 var(--font-body)' }}>
@@ -534,9 +595,12 @@ export function StaffPage({ scenarios, roles, injectedRanking, injectedGenome, i
   );
 }
 
-function ChemistryCard({ assessment }: { assessment: any }) {
-  const score = assessment.mechanical_synergy_score;
-  const barColor = score >= 0.3 ? '#10b981' : score >= 0 ? '#64748b' : score >= -0.3 ? '#f59e0b' : '#ef4444';
+function ChemistryCard({ assessment, llmSynergy }: { assessment: any; llmSynergy?: number }) {
+  const mechanicalScore = assessment.mechanical_synergy_score;
+  const score = llmSynergy ?? mechanicalScore;
+  const delta = llmSynergy != null ? llmSynergy - mechanicalScore : 0;
+  const hasLlm = llmSynergy != null && Math.abs(delta) > 0.01;
+  const barColor = hasLlm ? '#a78bfa' : (score >= 0.3 ? '#10b981' : score >= 0 ? '#64748b' : score >= -0.3 ? '#f59e0b' : '#ef4444');
   const barWidth = Math.abs(score) * 100;
 
   return (
@@ -544,6 +608,7 @@ function ChemistryCard({ assessment }: { assessment: any }) {
       padding: '10px 12px',
       minWidth: 140,
       flexShrink: 0,
+      borderLeft: hasLlm ? '2px solid #a78bfa' : undefined,
     }}>
       <div style={{ font: '500 13px/1.3 var(--font-body)', color: '#f1f5f9', marginBottom: 2 }}>
         {assessment.team_member_name}
@@ -587,6 +652,11 @@ function ChemistryCard({ assessment }: { assessment: any }) {
         }}>
           {score >= 0 ? '+' : ''}{score.toFixed(2)}
         </span>
+        {hasLlm && (
+          <span className="text-mono" style={{ fontSize: 9, color: '#a78bfa' }} title={`LLM adjusted from ${mechanicalScore.toFixed(2)}`}>
+            {delta > 0 ? '+' : ''}{delta.toFixed(2)}
+          </span>
+        )}
       </div>
 
       {/* Synergy/friction dimensions */}

@@ -19,8 +19,9 @@ orchestrator_agent = LlmAgent(
     name="orchestrator",
     model=settings.gemini_model_fast,
     description=(
-        "NEXUS session router. Matches user intent to DIAGNOSE, STAFF, "
-        "or LEARN mode and manages scenario context across modes."
+        "NEXUS session router. Classifies user intent by CONTENT and "
+        "immediately transfers to the matching pipeline. Does NOT answer "
+        "directly — always delegates. Carries scenario context across turns."
     ),
     instruction=ORCHESTRATOR_INSTRUCTION,
     tools=[suggest_scenarios],

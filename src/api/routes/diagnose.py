@@ -5,7 +5,6 @@ from pydantic import BaseModel
 
 from src.tools.diagnose_tools import (
     compute_cascade_impact,
-    create_compound_scenario,
     get_scenario_by_name,
     scan_vulnerabilities,
 )
@@ -18,13 +17,6 @@ class DiagnoseRequest(BaseModel):
 
     scenario_id: str | None = None
     scenario_name: str | None = None
-
-
-class CompoundRequest(BaseModel):
-    """Request body for creating a compound scenario."""
-
-    scenario_a_name: str
-    scenario_b_name: str
 
 
 @router.post("/run")
@@ -57,39 +49,6 @@ async def run_diagnose(request: DiagnoseRequest):
 
     vuln["cascades"] = cascades
     return vuln
-
-
-@router.post("/compound")
-async def create_compound(request: CompoundRequest):
-    """Create a compound scenario combining two simultaneous crises.
-
-    Persists the compound to the scenarios table so it can be used
-    in subsequent diagnose/staff runs by scenario_id.
-    """
-    from src.supabase_client import upsert
-
-    compound = create_compound_scenario(
-        request.scenario_a_name, request.scenario_b_name,
-    )
-    if "error" in compound:
-        return compound
-
-    # Persist to DB so downstream endpoints can find it by id
-    import uuid
-
-    compound["id"] = str(uuid.uuid4())
-    upsert("scenarios", {
-        "id": compound["id"],
-        "name": compound["name"],
-        "category": compound.get("category", "compound"),
-        "narrative": compound.get("narrative", ""),
-        "probability": compound.get("probability", 0.01),
-        "capability_demand_vector": compound["capability_demand_vector"],
-        "affected_org_units": compound.get("affected_org_units", []),
-        "time_horizon_months": compound.get("time_horizon_months", 12),
-    })
-
-    return compound
 
 
 @router.get("/cascade/{role_id}")

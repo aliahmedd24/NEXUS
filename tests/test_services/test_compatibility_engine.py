@@ -22,7 +22,7 @@ def test_complementary_pair_positive_synergy():
     result = compute_pairwise_compatibility(
         strategist, executor, "cross_functional", rules
     )
-    assert result["synergy_score"] > 0
+    assert result["mechanical_synergy_score"] > 0
 
 
 def test_clash_pair_negative_synergy():
@@ -39,7 +39,7 @@ def test_clash_pair_negative_synergy():
         }
     ]
     result = compute_pairwise_compatibility(leader_a, leader_b, "peer", rules)
-    assert result["synergy_score"] < 0
+    assert result["mechanical_synergy_score"] < 0
 
 
 def test_team_balance_fills_gap():

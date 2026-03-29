@@ -441,9 +441,25 @@ export function DiagnosePage({ scenarios, onResultReady, compoundScenario, injec
                       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                         <div>
                           <span className="text-caption" style={{ color: '#64748b' }}>Total Exposure</span>
-                          <div className="score-badge score-badge--critical" style={{ marginTop: 4 }}>
-                            &euro;{(c.mechanical_total_eur / 1_000_000).toFixed(1)}M
-                          </div>
+                          {(() => {
+                            const llmTotal = llmCascade ? Number((llmCascade as Record<string, unknown>).total_exposure_eur ?? 0) : 0;
+                            return llmTotal > 0 ? (
+                              <div style={{ marginTop: 4 }}>
+                                <span className="score-badge" style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>
+                                  &euro;{(llmTotal / 1_000_000).toFixed(1)}M
+                                </span>
+                                {Math.abs(llmTotal - c.mechanical_total_eur) > 10000 && (
+                                  <span className="text-mono" style={{ fontSize: 10, color: '#64748b', marginLeft: 6 }}>
+                                    was &euro;{(c.mechanical_total_eur / 1_000_000).toFixed(1)}M
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="score-badge score-badge--critical" style={{ marginTop: 4 }}>
+                                &euro;{(c.mechanical_total_eur / 1_000_000).toFixed(1)}M
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div>
                           <span className="text-caption" style={{ color: '#64748b' }}>Chain Length</span>
@@ -476,16 +492,28 @@ export function DiagnosePage({ scenarios, onResultReady, compoundScenario, injec
         title="Cascade Impact Analysis"
       >
         {cascade && selectedCell && (
-          <CascadeDetail cell={selectedCell} cascade={cascade} />
+          <CascadeDetail cell={selectedCell} cascade={cascade} llmCascade={llmCascade} />
         )}
       </DetailSlidePanel>
     </div>
   );
 }
 
-function CascadeDetail({ cell, cascade }: { cell: HeatmapCell; cascade: CascadeReport }) {
+function CascadeDetail({ cell, cascade, llmCascade }: { cell: HeatmapCell; cascade: CascadeReport; llmCascade?: Record<string, unknown> | null }) {
   const totalCost = cascade.cascade_chain.reduce((sum, n) => sum + (n.mechanical_cost_eur || 0), 0);
   const totalDelay = cascade.cascade_chain.reduce((max, n) => Math.max(max, n.estimated_delay_days || 0), 0);
+
+  // LLM cascade overlay
+  const llmTotalEur = llmCascade ? Number((llmCascade as Record<string, unknown>).total_exposure_eur ?? 0) : null;
+  const llmChainNodes = llmCascade && Array.isArray((llmCascade as Record<string, unknown>).cascade_chain)
+    ? (llmCascade as Record<string, unknown>).cascade_chain as Array<Record<string, unknown>>
+    : [];
+  const llmNodeCostMap = new Map<string, number>();
+  for (const node of llmChainNodes) {
+    if (node.org_unit_name && typeof node.estimated_cost_eur === 'number') {
+      llmNodeCostMap.set(String(node.org_unit_name), node.estimated_cost_eur as number);
+    }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -509,16 +537,20 @@ function CascadeDetail({ cell, cascade }: { cell: HeatmapCell; cascade: CascadeR
           isFirst
         />
 
-        {cascade.cascade_chain.map((node, i) => (
-          <CascadeNodeCard
-            key={i}
-            name={node.org_unit_name}
-            label={node.dependency_type}
-            impact={node.impact_score}
-            cost={node.estimated_cost_eur}
-            depth={node.depth}
-          />
-        ))}
+        {cascade.cascade_chain.map((node, i) => {
+          const llmCost = llmNodeCostMap.get(node.org_unit_name);
+          return (
+            <CascadeNodeCard
+              key={i}
+              name={node.org_unit_name}
+              label={node.dependency_type}
+              impact={node.impact_score}
+              cost={node.mechanical_cost_eur}
+              llmCost={llmCost}
+              depth={node.depth}
+            />
+          );
+        })}
       </div>
 
       {/* Summary */}
@@ -531,9 +563,24 @@ function CascadeDetail({ cell, cascade }: { cell: HeatmapCell; cascade: CascadeR
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span className="text-caption" style={{ color: '#64748b' }}>TOTAL EXPOSURE</span>
-          <span className="score-badge score-badge--critical">
-            &euro;{(totalCost / 1_000_000).toFixed(1)}M
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {llmTotalEur != null && llmTotalEur > 0 ? (
+              <>
+                <span className="score-badge" style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>
+                  &euro;{(llmTotalEur / 1_000_000).toFixed(1)}M
+                </span>
+                {Math.abs(llmTotalEur - totalCost) > 10000 && (
+                  <span className="text-mono" style={{ fontSize: 10, color: '#64748b' }}>
+                    was &euro;{(totalCost / 1_000_000).toFixed(1)}M
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="score-badge score-badge--critical">
+                &euro;{(totalCost / 1_000_000).toFixed(1)}M
+              </span>
+            )}
+          </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span className="text-caption" style={{ color: '#64748b' }}>MAX DELAY</span>
@@ -558,8 +605,8 @@ function CascadeDetail({ cell, cascade }: { cell: HeatmapCell; cascade: CascadeR
   );
 }
 
-function CascadeNodeCard({ name, label, impact, cost, isFirst }: {
-  name: string; label: string; impact: number; cost: number; depth?: number; isFirst?: boolean;
+function CascadeNodeCard({ name, label, impact, cost, llmCost, isFirst }: {
+  name: string; label: string; impact: number; cost: number; llmCost?: number; depth?: number; isFirst?: boolean;
 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'stretch' }}>
@@ -610,11 +657,20 @@ function CascadeNodeCard({ name, label, impact, cost, isFirst }: {
             <span className="text-mono" style={{ fontSize: 11, color: '#94a3b8' }}>
               Impact: {impact.toFixed(2)}
             </span>
-            {cost > 0 && (
+            {(llmCost != null && llmCost > 0) ? (
+              <span className="text-mono" style={{ fontSize: 11, color: '#a78bfa' }}>
+                &euro;{(llmCost / 1_000_000).toFixed(2)}M
+                {cost > 0 && Math.abs(llmCost - cost) > 10000 && (
+                  <span style={{ color: '#64748b', fontSize: 9, marginLeft: 3 }}>
+                    was &euro;{(cost / 1_000_000).toFixed(2)}M
+                  </span>
+                )}
+              </span>
+            ) : cost > 0 ? (
               <span className="text-mono" style={{ fontSize: 11, color: '#ef4444' }}>
                 &euro;{(cost / 1_000_000).toFixed(2)}M
               </span>
-            )}
+            ) : null}
           </div>
         )}
       </div>

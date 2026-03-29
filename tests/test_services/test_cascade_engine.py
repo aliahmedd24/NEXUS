@@ -21,14 +21,15 @@ def test_cascade_stops_at_threshold():
 
 
 def test_cascade_includes_direct_dependency():
-    """Direct downstream with strong coupling is always included."""
+    """Direct downstream dependency is always included."""
     deps = [
-        {"upstream": "A", "downstream": "B", "coupling_strength": 0.9, "dependency_type": "production_flow"},
+        {"upstream": "A", "downstream": "B", "dependency_type": "production_flow"},
     ]
     chain = compute_cascade("A", 0.8, deps, 1.0)
     assert len(chain) == 1
     assert chain[0]["org_unit_id"] == "B"
-    assert chain[0]["impact_score"] > 0.5
+    # Neutral coupling (0.5): 0.8 * 1.0 * 0.5 = 0.4
+    assert chain[0]["impact_score"] > 0.3
 
 
 def test_cascade_traverses_upstream_for_leaf_nodes():

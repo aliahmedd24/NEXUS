@@ -109,9 +109,9 @@ def compute_roi_estimate(
     ROI = (risk_reduction - hiring_cost) / hiring_cost.
 
     Args:
-        staffing_plan: Dict with items (list of hire dicts with estimated_cost_eur)
+        staffing_plan: Dict with items (list of hire dicts with mechanical_cost_eur)
             and total_cost_eur.
-        cascade_impacts: List of cascade impact dicts with estimated_cost_eur
+        cascade_impacts: List of cascade impact dicts with mechanical_cost_eur
             representing damage if roles remain unfilled.
 
     Returns:
@@ -120,12 +120,13 @@ def compute_roi_estimate(
     total_hiring_cost = staffing_plan.get("total_cost_eur", 0)
     if not total_hiring_cost:
         total_hiring_cost = sum(
-            item.get("estimated_cost_eur", 0)
+            item.get("mechanical_cost_eur", item.get("estimated_cost_eur", 0))
             for item in staffing_plan.get("items", [])
         )
 
     total_risk_avoided = sum(
-        c.get("estimated_cost_eur", 0) for c in cascade_impacts
+        c.get("mechanical_cost_eur", c.get("estimated_cost_eur", 0))
+        for c in cascade_impacts
     )
 
     roi = (

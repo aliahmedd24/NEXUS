@@ -226,15 +226,19 @@ def simulate_counterfactual(
         if s.get("assessor_type") == "composite"
     }
 
-    # Get role requirements from JD template
-    required: dict[str, float] = {}
-    if role.get("jd_template_id"):
-        template = fetch_one("jd_templates", role["jd_template_id"])
-        if template:
-            required = template.get("competency_weightings", {})
+    # Use neutral (equal) weights for counterfactual fit — no hardcoded role
+    # profiles biasing the simulation. The LLM reasons about fit quality.
+    required = {
+        "strategic_thinking": 0.0833, "operational_execution": 0.0833,
+        "change_management": 0.0833, "crisis_leadership": 0.0833,
+        "people_development": 0.0833, "technical_depth": 0.0833,
+        "cross_functional_collab": 0.0833, "innovation_orientation": 0.0833,
+        "cultural_sensitivity": 0.0833, "risk_calibration": 0.0833,
+        "stakeholder_management": 0.0833, "resilience_adaptability": 0.0833,
+    }
 
     # Simulate fit -> predicted performance
-    alt_fit = compute_weighted_fit_score(alt_genome, required) if required else 0.5
+    alt_fit = compute_weighted_fit_score(alt_genome, required)
 
     # Compute divergence from actual outcome
     actual_qoh = 0.5

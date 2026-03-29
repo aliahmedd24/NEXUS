@@ -39,7 +39,7 @@ def suggest_scenarios(industry_context: str = "") -> dict:
                 "description": s.get("narrative", ""),
                 "probability": s.get("probability", 0),
                 "affected_org_units": s.get("affected_org_units", []),
-                "capability_demands": s.get("capability_demand_vector", {}),
+                "historical_demand_reference": s.get("capability_demand_vector", {}),
             }
             for s in ranked
         ],

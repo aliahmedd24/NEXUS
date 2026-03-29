@@ -4,8 +4,10 @@ Query Supabase for scenario/role/leader data and delegate computation
 to Phase 3 services. All database access via supabase_client helpers.
 """
 
+import json
+import uuid
+
 from src.services.cascade_engine import compute_cascade, find_optimal_intervention_point
-from src.services.scenario_engine import combine_scenarios
 from src.supabase_client import fetch_all, fetch_by_column, fetch_ilike, fetch_one
 
 
@@ -13,88 +15,153 @@ def get_scenario_library() -> list[dict]:
     """Retrieve all available stress scenarios from the database.
 
     Returns a list of scenarios with id, name, category, narrative,
-    probability, capability_demand_vector, and time_horizon_months.
+    probability, time_horizon_months, and affected_org_units.
+    Use these as CONTEXT for understanding known risk scenarios — then
+    create your OWN demand vector via create_adhoc_scenario.
+
+    Returns:
+        List of scenario dicts. The capability_demand_vector field is
+        included as historical_demand_reference (for context only — do NOT
+        use it as your demand vector. Generate your own.)
     """
-    return fetch_all("scenarios")
+    scenarios = fetch_all("scenarios")
+    for s in scenarios:
+        if "capability_demand_vector" in s:
+            s["historical_demand_reference"] = s.pop("capability_demand_vector")
+    return scenarios
 
 
 def get_scenario_by_name(scenario_name: str) -> dict:
     """Retrieve a specific scenario by name or partial match.
 
+    Use this to look up known scenarios for CONTEXT (narrative, probability,
+    affected units). Then create your OWN demand vector via create_adhoc_scenario.
+
     Args:
         scenario_name: Full or partial name of the scenario.
 
     Returns:
-        The matching scenario object with all fields, or an error message.
+        The matching scenario with narrative context. The capability_demand_vector
+        is included as historical_demand_reference (for context only — generate
+        your own demand vector via create_adhoc_scenario).
     """
     results = fetch_ilike("scenarios", "name", f"%{scenario_name}%")
     if not results:
         return {"error": f"No scenario matching '{scenario_name}' found."}
-    return results[0]
+    scenario = results[0]
+    if "capability_demand_vector" in scenario:
+        scenario["historical_demand_reference"] = scenario.pop("capability_demand_vector")
+    return scenario
 
 
-def create_compound_scenario(
-    scenario_name_a: str, scenario_name_b: str
+def create_adhoc_scenario(
+    scenario_name: str,
+    narrative: str,
+    probability: float,
+    capability_demand_vector: str,
+    time_horizon_months: int = 12,
+    affected_org_units: str = "[]",
 ) -> dict:
-    """Create a compound scenario combining two simultaneous crises.
+    """Create a novel scenario that doesn't exist in the database.
 
-    The compound demand vector uses element-wise maximum with interaction
-    boosts for dimensions that are critical in both scenarios.
+    Use this when the user asks about a scenario NOT in the scenario library.
+    You must reason about which of the 12 leadership dimensions would spike
+    in demand and set the capability_demand_vector yourself.
+
+    The 12 dimensions are: strategic_thinking, operational_execution,
+    change_management, crisis_leadership, people_development, technical_depth,
+    cross_functional_collab, innovation_orientation, cultural_sensitivity,
+    risk_calibration, stakeholder_management, resilience_adaptability.
+
+    Each dimension value should be between 0.0 and 1.0 (where 0.35 is a
+    neutral baseline — values above 0.6 indicate significant demand).
 
     Args:
-        scenario_name_a: Name of the first scenario.
-        scenario_name_b: Name of the second scenario.
+        scenario_name: Short name for the scenario (e.g. "Munich Earthquake").
+        narrative: 2-4 sentence description of the crisis and its business impact.
+        probability: Estimated probability 0.0-1.0.
+        capability_demand_vector: JSON string mapping dimension names to demand
+            values, e.g. '{"crisis_leadership": 0.95, "operational_execution": 0.90, ...}'.
+            You MUST include all 12 dimensions.
+        time_horizon_months: How many months this scenario plays out over.
+        affected_org_units: JSON string list of affected org unit names,
+            e.g. '["Munich Plant", "Supply Chain"]'.
 
     Returns:
-        A new compound scenario with combined demands and adjusted probability.
+        A complete scenario dict identical in shape to DB scenarios, with an
+        "adhoc:" prefixed ID. Pass this to downstream tools via scenario_json.
     """
-    sa = fetch_ilike("scenarios", "name", f"%{scenario_name_a}%")
-    sb = fetch_ilike("scenarios", "name", f"%{scenario_name_b}%")
-    if not sa or not sb:
-        return {"error": "One or both scenarios not found."}
+    try:
+        demand = json.loads(capability_demand_vector)
+    except json.JSONDecodeError:
+        return {"error": "capability_demand_vector must be valid JSON string."}
 
-    scenario_a = sa[0]
-    scenario_b = sb[0]
-    demand_a = scenario_a.get("capability_demand_vector", {})
-    demand_b = scenario_b.get("capability_demand_vector", {})
+    required_dims = {
+        "strategic_thinking", "operational_execution", "change_management",
+        "crisis_leadership", "people_development", "technical_depth",
+        "cross_functional_collab", "innovation_orientation", "cultural_sensitivity",
+        "risk_calibration", "stakeholder_management", "resilience_adaptability",
+    }
+    missing = required_dims - set(demand.keys())
+    if missing:
+        # Fill missing dims with 0.35 baseline rather than failing
+        for dim in missing:
+            demand[dim] = 0.35
 
-    combined_demand = combine_scenarios(demand_a, demand_b)
+    try:
+        units = json.loads(affected_org_units)
+    except json.JSONDecodeError:
+        units = []
 
-    return {
-        "name": f"{scenario_a['name']} + {scenario_b['name']}",
-        "category": "compound",
-        "narrative": (
-            f"Compound scenario: {scenario_a['name']} occurring simultaneously "
-            f"with {scenario_b['name']}."
-        ),
-        "probability": round(scenario_a["probability"] * scenario_b["probability"], 4),
-        "capability_demand_vector": combined_demand,
-        "time_horizon_months": max(
-            scenario_a.get("time_horizon_months", 12),
-            scenario_b.get("time_horizon_months", 12),
-        ),
-        "affected_org_units": list(
-            set(scenario_a.get("affected_org_units", []))
-            | set(scenario_b.get("affected_org_units", []))
-        ),
+    scenario = {
+        "id": f"adhoc:{uuid.uuid4().hex[:12]}",
+        "name": scenario_name,
+        "category": "adhoc",
+        "narrative": narrative,
+        "probability": max(0.0, min(1.0, probability)),
+        "capability_demand_vector": demand,
+        "time_horizon_months": time_horizon_months,
+        "affected_org_units": units if isinstance(units, list) else [],
     }
 
+    return scenario
 
-def scan_vulnerabilities(scenario_id: str) -> dict:
+
+def scan_vulnerabilities(scenario_id: str = "", scenario_json: str = "") -> dict:
     """Run vulnerability scan: evaluate all critical leadership roles against a scenario.
 
     For each filled role, computes gap between leader's genome and scenario demands.
     Vacant roles are automatic RED. Returns a heatmap with aggregate resilience score.
 
+    Accepts EITHER a scenario_id (UUID for DB lookup) OR scenario_json (inline
+    scenario dict as JSON string, from create_adhoc_scenario). If both are
+    provided, scenario_json takes priority.
+
     Args:
-        scenario_id: UUID of the scenario to test against.
+        scenario_id: UUID of the scenario to test against. Use this for
+            scenarios that exist in the database.
+        scenario_json: JSON string of a full scenario dict (from
+            create_adhoc_scenario). Use this
+            for ad-hoc or compound scenarios not stored in the database.
 
     Returns:
         Heatmap data with per-role gap scores, status colors, and aggregate resilience.
     """
-    scenario = fetch_one("scenarios", scenario_id)
+    scenario = None
+
+    # Try inline scenario first
+    if scenario_json:
+        try:
+            scenario = json.loads(scenario_json)
+        except json.JSONDecodeError:
+            return {"error": "scenario_json is not valid JSON."}
+
+    # Fall back to DB lookup
+    if not scenario and scenario_id:
+        scenario = fetch_one("scenarios", scenario_id)
+
     if not scenario:
-        return {"error": f"Scenario {scenario_id} not found."}
+        return {"error": f"Scenario not found. Provide a valid scenario_id or scenario_json."}
 
     demand_vector = scenario["capability_demand_vector"]
     roles = fetch_all("roles")
@@ -191,31 +258,49 @@ def scan_vulnerabilities(scenario_id: str) -> dict:
     }
 
 
-def compute_cascade_impact(role_id: str, scenario_id: str) -> dict:
+def compute_cascade_impact(role_id: str, scenario_id: str = "", scenario_json: str = "") -> dict:
     """Model cascade impact if a role fails under a scenario.
 
     Traces the dependency graph downstream from the role's org unit,
     computing impact at each node and quantifying total EUR exposure.
 
+    Accepts EITHER a scenario_id (UUID for DB lookup) OR scenario_json
+    (inline scenario dict as JSON string). If both provided, scenario_json
+    takes priority.
+
     Args:
         role_id: UUID of the vulnerable role.
-        scenario_id: UUID of the active scenario.
+        scenario_id: UUID of the active scenario. Use for DB scenarios.
+        scenario_json: JSON string of a full scenario dict (from
+            create_adhoc_scenario). Use for
+            ad-hoc or compound scenarios not stored in the database.
 
     Returns:
         Cascade chain, total impact in EUR, and optimal intervention point.
     """
     role = fetch_one("roles", role_id)
-    scenario = fetch_one("scenarios", scenario_id)
-    if not role or not scenario:
-        return {"error": "Role or scenario not found."}
+    if not role:
+        return {"error": f"Role {role_id} not found."}
 
-    # Transform org_dependencies to the format compute_cascade expects
+    scenario = None
+    if scenario_json:
+        try:
+            scenario = json.loads(scenario_json)
+        except json.JSONDecodeError:
+            return {"error": "scenario_json is not valid JSON."}
+    if not scenario and scenario_id:
+        scenario = fetch_one("scenarios", scenario_id)
+    if not scenario:
+        return {"error": "Scenario not found. Provide a valid scenario_id or scenario_json."}
+
+    # Transform org_dependencies — no coupling_strength passed (cascade engine
+    # uses neutral 0.5 for all edges). The LLM reasons about coupling from
+    # dependency type and organizational context.
     raw_deps = fetch_all("org_dependencies")
     dependencies = [
         {
             "upstream": d["upstream_unit_id"],
             "downstream": d["downstream_unit_id"],
-            "coupling_strength": d.get("coupling_strength", 0.5),
             "dependency_type": d.get("dependency_type", "unknown"),
         }
         for d in raw_deps
@@ -249,10 +334,23 @@ def compute_cascade_impact(role_id: str, scenario_id: str) -> dict:
         "cascade_chain": chain,
         "mechanical_total_eur": sum(n.get("mechanical_cost_eur", 0) for n in chain),
         "optimal_intervention": intervention,
-        # Raw data for LLM-driven cascade analysis — the agent uses these
-        # to reason about impact magnitudes rather than relying on hardcoded
-        # EUR multipliers in the chain nodes.
-        "_raw_dependency_graph": dependencies,
+        # Raw data for LLM-driven cascade analysis — qualitative dependency
+        # types only, no hardcoded coupling strengths. The LLM reasons about
+        # coupling intensity from organizational context.
+        "_raw_dependency_graph": [
+            {
+                "upstream": d["upstream"],
+                "downstream": d["downstream"],
+                "dependency_type": d["dependency_type"],
+                "description": next(
+                    (rd.get("description", "") for rd in raw_deps
+                     if rd["upstream_unit_id"] == d["upstream"]
+                     and rd["downstream_unit_id"] == d["downstream"]),
+                    "",
+                ),
+            }
+            for d in dependencies
+        ],
         "_raw_org_unit_names": org_units,
         "_raw_scenario_probability": scenario.get("probability", 0.5),
         "_raw_scenario_narrative": scenario.get("narrative", ""),

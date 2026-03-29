@@ -7,6 +7,8 @@ Engine, and Pipeline & Portfolio Optimizer.
 Also includes RAG-powered semantic search tools from Phase 2.5.
 """
 
+import json
+
 from src.embeddings import embed_query
 from src.services.compatibility_engine import (
     compute_pairwise_compatibility,
@@ -22,7 +24,6 @@ from src.services.portfolio_math import (
     compute_efficient_frontier,
     compute_roi_estimate,
 )
-from src.services.scenario_engine import adapt_jd_weightings
 from src.supabase_client import (
     fetch_all,
     fetch_by_column,
@@ -30,6 +31,40 @@ from src.supabase_client import (
     semantic_search_feedback,
     semantic_search_leaders,
 )
+
+
+# Equal weight across all 12 leadership dimensions — an unbiased mechanical
+# baseline. The LLM reasons about which dimensions actually matter per role.
+_NEUTRAL_WEIGHT = round(1.0 / 12, 4)
+_NEUTRAL_WEIGHTS = {
+    "strategic_thinking": _NEUTRAL_WEIGHT,
+    "operational_execution": _NEUTRAL_WEIGHT,
+    "change_management": _NEUTRAL_WEIGHT,
+    "crisis_leadership": _NEUTRAL_WEIGHT,
+    "people_development": _NEUTRAL_WEIGHT,
+    "technical_depth": _NEUTRAL_WEIGHT,
+    "cross_functional_collab": _NEUTRAL_WEIGHT,
+    "innovation_orientation": _NEUTRAL_WEIGHT,
+    "cultural_sensitivity": _NEUTRAL_WEIGHT,
+    "risk_calibration": _NEUTRAL_WEIGHT,
+    "stakeholder_management": _NEUTRAL_WEIGHT,
+    "resilience_adaptability": _NEUTRAL_WEIGHT,
+}
+
+
+def _resolve_scenario(scenario_id: str = "", scenario_json: str = "") -> dict | None:
+    """Resolve a scenario from either a DB ID or inline JSON string.
+
+    Returns the scenario dict, or None if neither source yields a result.
+    """
+    if scenario_json:
+        try:
+            return json.loads(scenario_json)
+        except json.JSONDecodeError:
+            return None
+    if scenario_id:
+        return fetch_one("scenarios", scenario_id)
+    return None
 
 
 def search_feedback_by_trait(
@@ -115,14 +150,14 @@ def find_similar_leaders(leader_id: str, top_k: int = 5) -> list[dict]:
 def get_jd_template(role_type: str) -> dict:
     """Retrieve the base JD template for a role type.
 
-    Returns the full job description template including competency weightings,
-    base description, and required experience.
+    Returns the job description template with text description,
+    required experience, and compensation range.
 
     Args:
         role_type: The role type string (e.g., "Head of EV Battery Systems").
 
     Returns:
-        JD template dict with role_type, base_description, competency_weightings,
+        JD template dict with role_type, base_description, min_experience_years,
         and other fields, or an error message if not found.
     """
     templates = fetch_by_column("jd_templates", "role_type", role_type)
@@ -131,80 +166,79 @@ def get_jd_template(role_type: str) -> dict:
     return templates[0]
 
 
-def adapt_jd_to_scenario(role_type: str, scenario_id: str) -> dict:
-    """Adapt a JD's competency weightings based on scenario demands.
+def adapt_jd_to_scenario(role_type: str, scenario_id: str = "", scenario_json: str = "") -> dict:
+    """Retrieve JD template and scenario context for LLM-driven JD adaptation.
 
-    Increases weight for capabilities the scenario demands, decreases
-    for less critical ones, and renormalizes to sum 1.0.
+    Returns the role description, scenario narrative, and scenario demand
+    vector. The LLM reasons about which competencies matter most for THIS
+    role under THIS scenario — no hardcoded competency weights are applied.
+
+    Accepts scenario_id (DB lookup) OR scenario_json (inline JSON string
+    from create_adhoc_scenario). If both provided, scenario_json wins.
 
     Args:
         role_type: The role type (e.g., "Head of EV Battery Systems").
-        scenario_id: UUID of the active scenario.
+        scenario_id: UUID of the active scenario (DB lookup).
+        scenario_json: JSON string of inline scenario dict (ad-hoc scenarios).
 
     Returns:
-        Adapted JD with original_weightings, adapted_weightings, and changes list.
+        JD template data and scenario context for LLM analysis.
     """
     templates = fetch_by_column("jd_templates", "role_type", role_type)
     if not templates:
         return {"error": f"No template for role type '{role_type}'."}
     template = templates[0]
 
-    scenario = fetch_one("scenarios", scenario_id)
+    scenario = _resolve_scenario(scenario_id, scenario_json)
     if not scenario:
-        return {"error": f"Scenario {scenario_id} not found."}
-
-    adapted, changes = adapt_jd_weightings(
-        template["competency_weightings"],
-        scenario["capability_demand_vector"],
-    )
+        return {"error": "Scenario not found. Provide a valid scenario_id or scenario_json."}
 
     return {
         "role_type": role_type,
         "base_description": template["base_description"],
-        "original_weightings": template["competency_weightings"],
-        "adapted_weightings": adapted,
-        "changes": changes,
+        "min_experience_years": template.get("min_experience_years"),
+        "typical_compensation_range": template.get("typical_compensation_range"),
+        "typical_time_to_fill_days": template.get("typical_time_to_fill_days"),
         "scenario_name": scenario["name"],
-        # Raw data for LLM-driven JD analysis
-        "_raw_scenario_narrative": scenario.get("narrative", ""),
-        "_raw_scenario_demands": scenario["capability_demand_vector"],
+        "scenario_narrative": scenario.get("narrative", ""),
+        "scenario_demand_vector": scenario["capability_demand_vector"],
     }
 
 
 def critique_jd(adapted_jd_json: str) -> dict:
-    """Critique an adapted JD for common problems.
+    """Critique a scenario demand vector for common JD problems.
 
-    Analyzes the adapted JD for issues like conflicting requirements,
-    unicorn detection (unrealistically high demands across too many
-    dimensions), incumbent cloning, and gender-coded language.
+    Analyzes the scenario's capability demands for issues like unicorn
+    profiles (too many high-demand dimensions), conflicting requirements,
+    concentration risk, and flat profiles.
 
-    This is a pure analysis tool — the LLM agent uses it to reason
-    about JD quality before finalizing.
+    The LLM agent passes the scenario_demand_vector as JSON for analysis.
 
     Args:
-        adapted_jd_json: JSON string of the adapted JD (from adapt_jd_to_scenario).
+        adapted_jd_json: JSON string of the demand vector or JD data.
+            Accepts either a raw demand vector dict (dim -> value) or a
+            dict with a "scenario_demand_vector" key.
 
     Returns:
         Critique report with flags and recommendations.
     """
-    import json
-
     try:
         jd = json.loads(adapted_jd_json) if isinstance(adapted_jd_json, str) else adapted_jd_json
     except (json.JSONDecodeError, TypeError):
         return {"error": "Invalid JSON input for JD critique."}
 
+    # Accept either a demand vector directly or nested in a dict
+    demands = jd.get("scenario_demand_vector", jd) if isinstance(jd, dict) else {}
+    if not demands or not isinstance(demands, dict):
+        return {"error": "No demand vector found. Pass scenario_demand_vector as JSON."}
+
     flags: list[str] = []
-    weightings = jd.get("adapted_weightings", {})
 
-    if not weightings:
-        return {"error": "No adapted_weightings found in JD."}
-
-    # Unicorn detection: too many high-weight dimensions
-    high_weight_dims = [d for d, w in weightings.items() if w > 0.10]
-    if len(high_weight_dims) > 6:
+    # Unicorn detection: too many high-demand dimensions
+    high_demand_dims = [d for d, v in demands.items() if v > 0.65]
+    if len(high_demand_dims) > 6:
         flags.append(
-            f"UNICORN RISK: {len(high_weight_dims)} dimensions weighted > 0.10. "
+            f"UNICORN RISK: {len(high_demand_dims)} dimensions with demand > 0.65. "
             "This profile may not exist in the market. Consider prioritizing top 4-5."
         )
 
@@ -214,30 +248,30 @@ def critique_jd(adapted_jd_json: str) -> dict:
         ("operational_execution", "strategic_thinking"),
     ]
     for dim_a, dim_b in conflict_pairs:
-        w_a = weightings.get(dim_a, 0)
-        w_b = weightings.get(dim_b, 0)
-        if w_a > 0.10 and w_b > 0.10:
+        v_a = demands.get(dim_a, 0)
+        v_b = demands.get(dim_b, 0)
+        if v_a > 0.65 and v_b > 0.65:
             flags.append(
-                f"POTENTIAL CONFLICT: Both {dim_a} ({w_a:.2f}) and "
-                f"{dim_b} ({w_b:.2f}) are heavily weighted. These dimensions "
+                f"POTENTIAL CONFLICT: Both {dim_a} ({v_a:.2f}) and "
+                f"{dim_b} ({v_b:.2f}) are high-demand. These dimensions "
                 "often trade off in practice."
             )
 
-    # Concentration risk: single dimension > 25%
-    for dim, weight in weightings.items():
-        if weight > 0.25:
+    # Concentration risk: single dimension > 0.95
+    for dim, value in demands.items():
+        if value > 0.95:
             flags.append(
-                f"CONCENTRATION: {dim} at {weight:.2f} dominates the profile. "
+                f"CONCENTRATION: {dim} at {value:.2f} dominates the profile. "
                 "A single-dimension focus may miss well-rounded candidates."
             )
 
-    # Flat profile: all weights very similar (no differentiation)
-    weight_values = list(weightings.values())
-    if weight_values:
-        w_range = max(weight_values) - min(weight_values)
-        if w_range < 0.04:
+    # Flat profile: all demands very similar (no differentiation)
+    demand_values = [v for v in demands.values() if isinstance(v, (int, float))]
+    if demand_values:
+        d_range = max(demand_values) - min(demand_values)
+        if d_range < 0.15:
             flags.append(
-                "FLAT PROFILE: All dimensions weighted nearly equally. "
+                "FLAT PROFILE: All dimensions have similar demand levels. "
                 "This doesn't differentiate for the scenario — consider sharpening."
             )
 
@@ -374,7 +408,7 @@ def get_leader_genome(leader_id: str) -> dict:
 
 
 def compute_candidate_fit(
-    leader_id: str, role_type: str, scenario_id: str = "",
+    leader_id: str, role_type: str, scenario_id: str = "", scenario_json: str = "",
 ) -> dict:
     """Compute how well a candidate fits a role, optionally under a scenario.
 
@@ -384,6 +418,7 @@ def compute_candidate_fit(
         leader_id: UUID of the candidate.
         role_type: Role type to evaluate against.
         scenario_id: Optional scenario UUID for adapted weightings.
+        scenario_json: Optional JSON string of inline scenario dict (ad-hoc).
 
     Returns:
         Fit report with overall_fit_score, per-dimension fits, strengths, gaps,
@@ -397,24 +432,9 @@ def compute_candidate_fit(
         if s.get("assessor_type") == "composite"
     }
 
-    # 2. Get required profile (base or scenario-adapted)
-    templates = fetch_by_column("jd_templates", "role_type", role_type)
-    if not templates:
-        return {"error": f"No JD template for role type '{role_type}'."}
-    required = templates[0]["competency_weightings"]
-    if scenario_id:
-        scenario = fetch_one("scenarios", scenario_id)
-        if scenario:
-            original_total = sum(required.values())
-            adapted, _ = adapt_jd_weightings(
-                required, scenario["capability_demand_vector"],
-            )
-            # Rescale to original magnitude — adapt_jd_weightings normalizes
-            # to sum=1.0, but fit scoring needs the original scale so thresholds
-            # remain meaningful against 0-1 genome scores.
-            required = {
-                d: round(w * original_total, 4) for d, w in adapted.items()
-            }
+    # 2. Use neutral (equal) weights for mechanical baseline — no hardcoded
+    # role profiles biasing the score. The LLM reasons about role fit.
+    required = dict(_NEUTRAL_WEIGHTS)
 
     # 3. Get calibration coefficients (LEARN -> STAFF feedback loop)
     calibration_rows = fetch_all("calibration_coefficients")
@@ -448,7 +468,7 @@ def compute_candidate_fit(
     }
 
 
-def rank_candidates(role_type: str, scenario_id: str = "") -> dict:
+def rank_candidates(role_type: str, scenario_id: str = "", scenario_json: str = "") -> dict:
     """Rank all candidates by fit score for a role under a scenario.
 
     Calls get_candidate_pool and compute_candidate_fit per candidate,
@@ -457,6 +477,7 @@ def rank_candidates(role_type: str, scenario_id: str = "") -> dict:
     Args:
         role_type: Role type to rank candidates for.
         scenario_id: Optional scenario UUID for scenario-adapted ranking.
+        scenario_json: Optional JSON string of inline scenario dict (ad-hoc).
 
     Returns:
         Dict with org_unit_id, role_type, and candidates list sorted by fit.
@@ -466,7 +487,7 @@ def rank_candidates(role_type: str, scenario_id: str = "") -> dict:
 
     for candidate in pool:
         fit = compute_candidate_fit(
-            candidate["id"], role_type, scenario_id,
+            candidate["id"], role_type, scenario_id, scenario_json,
         )
         if "error" not in fit:
             fit["full_name"] = candidate["full_name"]
@@ -489,9 +510,9 @@ def rank_candidates(role_type: str, scenario_id: str = "") -> dict:
             if s.get("assessor_type") == "composite"
         }
 
-    # Get required profile for LLM context
+    # Get JD context for LLM reasoning (description, not numerical weights)
     templates = fetch_by_column("jd_templates", "role_type", role_type)
-    raw_required = templates[0]["competency_weightings"] if templates else {}
+    jd_description = templates[0].get("base_description", "") if templates else ""
 
     # Get calibration coefficients
     calibration_rows = fetch_all("calibration_coefficients")
@@ -507,7 +528,7 @@ def rank_candidates(role_type: str, scenario_id: str = "") -> dict:
         "candidates": rankings,
         # Raw data for LLM-driven ranking analysis
         "_raw_genomes": raw_genomes,
-        "_raw_required_profile": raw_required,
+        "_raw_jd_description": jd_description,
         "_raw_calibration": raw_calibration,
     }
 
@@ -658,8 +679,18 @@ def compute_team_compatibility(
         "team_member_count": len(team),
         "mechanical_avg_synergy": round(avg_synergy, 4),
         "team_balance": balance,
-        # Raw data for LLM-driven chemistry analysis
-        "_raw_interaction_rules": rules,
+        # Raw data for LLM-driven chemistry analysis — qualitative rules only,
+        # no hardcoded magnitudes. The LLM reasons about interaction strength.
+        "_raw_interaction_rules": [
+            {
+                "dimension_a": r["dimension_a"],
+                "dimension_b": r["dimension_b"],
+                "relationship_type": r.get("relationship_type", ""),
+                "interaction_effect": r["interaction_effect"],
+                "description": r.get("description", ""),
+            }
+            for r in rules
+        ],
         "_raw_candidate_genome": candidate_genome,
         "_raw_team_genomes": [
             {"name": m["full_name"], "role": m["role_title"], "genome": m["genome"]}
@@ -880,7 +911,7 @@ def generate_staffing_plan(
     frontier = compute_efficient_frontier(roles, candidates_per_role, budget_levels)
 
     # Total cost
-    total_cost = sum(item.get("estimated_cost_eur", 0) for item in plan_items)
+    total_cost = sum(item.get("mechanical_cost_eur", 0) for item in plan_items)
 
     # ROI estimate using cascade impacts as proxy
     roi = compute_roi_estimate(
@@ -899,7 +930,7 @@ def generate_staffing_plan(
 
 
 def generate_development_pathway(
-    leader_id: str, role_type: str, scenario_id: str = "",
+    leader_id: str, role_type: str, scenario_id: str = "", scenario_json: str = "",
 ) -> dict:
     """Generate a structured upskilling plan for an internal candidate.
 
@@ -912,6 +943,7 @@ def generate_development_pathway(
         leader_id: UUID of the internal candidate to develop.
         role_type: Target role type (e.g., "Head of EV Battery Systems").
         scenario_id: Optional scenario UUID for scenario-adapted gap analysis.
+        scenario_json: Optional JSON string of inline scenario dict (ad-hoc).
 
     Returns:
         Development pathway with gap analysis, intervention recommendations,
@@ -925,21 +957,9 @@ def generate_development_pathway(
         if s.get("assessor_type") == "composite"
     }
 
-    # 2. Get required profile (base or scenario-adapted)
-    templates = fetch_by_column("jd_templates", "role_type", role_type)
-    if not templates:
-        return {"error": f"No JD template for role type '{role_type}'."}
-    required = templates[0]["competency_weightings"]
-    if scenario_id:
-        scenario = fetch_one("scenarios", scenario_id)
-        if scenario:
-            original_total = sum(required.values())
-            adapted, _ = adapt_jd_weightings(
-                required, scenario["capability_demand_vector"],
-            )
-            required = {
-                d: round(w * original_total, 4) for d, w in adapted.items()
-            }
+    # 2. Use neutral (equal) weights for mechanical gap baseline — no hardcoded
+    # role profiles biasing the gap analysis. The LLM reasons about gaps.
+    required = dict(_NEUTRAL_WEIGHTS)
 
     # 3. Identify gaps (dimensions where candidate < requirement)
     gaps: list[dict] = []

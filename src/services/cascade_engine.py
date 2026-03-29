@@ -31,13 +31,15 @@ def compute_cascade(
     max_depth = 5
     min_impact = 0.1
 
-    # Build adjacency lists in both directions
+    # Build adjacency lists in both directions — coupling is neutral (0.5)
+    # for all edges. The LLM reasons about actual coupling strength from
+    # dependency type and organizational context.
     adj_down: dict[str, list[tuple[str, float, str]]] = {}
     adj_up: dict[str, list[tuple[str, float, str]]] = {}
     for dep in dependencies:
         upstream = dep["upstream"]
         downstream = dep["downstream"]
-        coupling = dep.get("coupling_strength", 0.5)
+        coupling = 0.5  # neutral — no hardcoded bias
         dep_type = dep.get("dependency_type", "unknown")
         adj_down.setdefault(upstream, []).append((downstream, coupling, dep_type))
         adj_up.setdefault(downstream, []).append((upstream, coupling, dep_type))
@@ -145,7 +147,7 @@ def quantify_impact(
         org_unit_id: The affected org unit ID.
 
     Returns:
-        Dict with estimated_cost_eur, estimated_delay_days, units_affected.
+        Dict with mechanical_cost_eur, estimated_delay_days, units_affected.
     """
     impact = cascade_node.get("impact_score", 0.0)
 

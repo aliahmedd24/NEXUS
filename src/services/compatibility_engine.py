@@ -36,7 +36,8 @@ def compute_pairwise_compatibility(
     synergy_dims: list[str] = []
     overlap_dims: list[str] = []
 
-    # Apply interaction rules
+    # Apply interaction rules — magnitude is neutral (0.5) for all rules.
+    # The LLM reasons about actual interaction strength from context.
     for rule in rules:
         if rule.get("relationship_type") and rule["relationship_type"] != relationship_type:
             continue
@@ -44,7 +45,7 @@ def compute_pairwise_compatibility(
         dim_a = rule["dimension_a"]
         dim_b = rule["dimension_b"]
         effect = rule["interaction_effect"]
-        magnitude = rule.get("effect_magnitude", 0.5)
+        magnitude = 0.5  # neutral — no hardcoded bias
 
         score_a = genome_a.get(dim_a, 5.0)
         score_b = genome_b.get(dim_b, 5.0)

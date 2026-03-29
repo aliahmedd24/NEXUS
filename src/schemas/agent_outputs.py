@@ -13,7 +13,13 @@ from pydantic import BaseModel, Field
 class ScenarioAnalysisOutput(BaseModel):
     """Output schema for Scenario Architect Agent."""
 
-    scenario_id: str
+    scenario_id: str = Field(
+        default="",
+        description=(
+            "UUID of the scenario if from DB, or 'adhoc:xxx' ID if created "
+            "via create_adhoc_scenario. Empty string if not applicable."
+        ),
+    )
     scenario_name: str
     category: str
     narrative_summary: str = Field(
@@ -30,6 +36,14 @@ class ScenarioAnalysisOutput(BaseModel):
     )
     recommendation: str = Field(
         description="Recommended next action for the decision-maker",
+    )
+    adhoc_scenario_json: str = Field(
+        default="",
+        description=(
+            "If this is an ad-hoc scenario (not from DB), this field contains "
+            "the full scenario dict as a JSON string. Downstream agents use "
+            "this via scenario_json parameter instead of scenario_id for DB lookup."
+        ),
     )
 
 
@@ -48,7 +62,10 @@ class VulnerabilityHeatmapCell(BaseModel):
 class VulnerabilityReportOutput(BaseModel):
     """Output schema for Vulnerability Scanner Agent."""
 
-    scenario_id: str = Field(description="UUID of the scenario — needed by cascade_modeler")
+    scenario_id: str = Field(
+        default="",
+        description="UUID of the scenario (or 'adhoc:xxx' for ad-hoc) — needed by cascade_modeler",
+    )
     scenario_name: str
     aggregate_resilience_score: float = Field(ge=0.0, le=1.0)
     critical_count: int

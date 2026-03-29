@@ -13,7 +13,7 @@ class SourcingOption(BaseModel):
     strategy: SourcingStrategy
     candidate_id: UUID | None = None
     candidate_name: str | None = None
-    estimated_cost_eur: float = 0
+    mechanical_cost_eur: float = 0
     estimated_time_days: int = 90
     quality_estimate: float = Field(0.5, ge=0.0, le=1.0)
     risk_level: str = "medium"
@@ -40,7 +40,7 @@ class StaffingPlanItem(BaseModel):
     sourcing_options: list[SourcingOption] = Field(default_factory=list)
     fit_score: float = Field(0.0, ge=0.0, le=1.0)
     resilience_contribution: float = 0.0
-    estimated_cost_eur: float = 0
+    mechanical_cost_eur: float = 0
     priority_rank: int = 0
     rationale: str = ""
 
