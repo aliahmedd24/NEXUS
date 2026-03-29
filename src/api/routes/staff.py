@@ -24,6 +24,13 @@ class StaffRunRequest(BaseModel):
     org_unit_id: str = ""
 
 
+class ChemistryRequest(BaseModel):
+    """Request body for team chemistry analysis."""
+
+    candidate_id: str
+    org_unit_id: str
+
+
 class StaffPlanRequest(BaseModel):
     """Request body for generating a staffing plan."""
 
@@ -42,12 +49,17 @@ async def run_staff(request: StaffRunRequest):
     ranked_result = rank_candidates(request.role_type, request.scenario_id)
     ranking = ranked_result.get("candidates", []) if isinstance(ranked_result, dict) else ranked_result
 
+    # Auto-detect org_unit_id from rank_candidates if not provided
+    org_unit_id = request.org_unit_id
+    if not org_unit_id and isinstance(ranked_result, dict):
+        org_unit_id = ranked_result.get("org_unit_id", "")
+
     chemistry = None
-    if request.org_unit_id and ranking:
+    if org_unit_id and ranking:
         top_candidate_id = ranking[0].get("leader_id", "")
         if top_candidate_id:
             chemistry = compute_team_compatibility(
-                top_candidate_id, request.org_unit_id,
+                top_candidate_id, org_unit_id,
             )
 
     return {
@@ -81,9 +93,9 @@ async def get_fit(leader_id: str, role_type: str, scenario_id: str = ""):
 
 
 @router.post("/chemistry")
-async def get_chemistry(candidate_id: str, org_unit_id: str):
+async def get_chemistry(request: ChemistryRequest):
     """Compute team compatibility for a candidate in an org unit."""
-    return compute_team_compatibility(candidate_id, org_unit_id)
+    return compute_team_compatibility(request.candidate_id, request.org_unit_id)
 
 
 @router.post("/plan")

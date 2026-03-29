@@ -1,13 +1,18 @@
 """FastAPI application entry point."""
 
 import logging
+import os
 
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.routes import diagnose, learn, scenarios, staff, what_if
 from src.config import settings
+
+# Export API key to env BEFORE any agent/genai imports
+os.environ.setdefault("GOOGLE_API_KEY", settings.google_api_key)
+
+from src.api.routes import chat, diagnose, learn, scenarios, staff, what_if
 
 structlog.configure(
     wrapper_class=structlog.make_filtering_bound_logger(
@@ -33,6 +38,7 @@ app.add_middleware(
 )
 
 # ─── Route Registration ────────────────────────────────────────────────
+app.include_router(chat.router)
 app.include_router(scenarios.router)
 app.include_router(diagnose.router)
 app.include_router(staff.router)

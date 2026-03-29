@@ -1,15 +1,28 @@
 # Python
 __pycache__/
 *.py[cod]
+*$py.class
 *.egg-info/
+*.egg
 dist/
 build/
+*.whl
+*.so
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+.pytype/
 venv/
 .venv/
 .python-version
+*.pyc
+pip-log.txt
+pip-delete-this-directory.txt
 
 # Environment & secrets
 .env
@@ -17,11 +30,20 @@ venv/
 !.env.example
 *.pem
 *.key
+*.p12
+*.pfx
+*.crt
+*.cer
 credentials.json
 service-account*.json
+*-credentials.json
 *.secret
 secrets/
 token.json
+.gcloud/
+.google/
+gcloud-service-key.json
+*.keystore
 
 # Agent / AI internal dirs
 .claude/
@@ -29,6 +51,8 @@ token.json
 .cursor/
 .copilot/
 .aider*
+.windsurf/
+.codeium/
 
 # MCP server config (contains project-specific keys/paths)
 .mcp.json
@@ -48,17 +72,61 @@ skills-lock.json
 
 # Node
 node_modules/
+.npm
+.yarn/
+.pnp.*
+*.tsbuildinfo
+.eslintcache
+.parcel-cache/
+.next/
+.nuxt/
+.cache/
+
+# Frontend build output
+frontend/dist/
+frontend/build/
+frontend/.env
+frontend/.env.*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
 
 # OS files
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
+ehthumbs.db
 desktop.ini
+$RECYCLE.BIN/
+*.lnk
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+*.iml
+
+# Testing & coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Misc
+*.bak
+*.tmp
+*.temp
+*.orig
+.netrc
+.ftpconfig
+.history/
 
 # Lock files (uv)
 # uv.lock is committed for reproducibility

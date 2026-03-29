@@ -92,9 +92,30 @@ def get_historical_decisions(limit: int = 10) -> list[dict]:
     """
     decisions = fetch_all("historical_decisions")[:limit]
     for d in decisions:
-        d["outcomes"] = fetch_by_column(
+        outcomes = fetch_by_column(
             "decision_outcomes", "decision_id", d["id"],
         )
+        # Compute outcome_category for each outcome
+        for o in outcomes:
+            rating = o.get("performance_rating", 5.0)
+            completion = o.get("goal_completion_pct", 50)
+            engagement = o.get("team_engagement_delta", 0) or 0
+            score = (rating / 10 * 0.5) + (completion / 100 * 0.3) + (max(0, 0.5 + engagement) * 0.2)
+            if score >= 0.75:
+                o["outcome_category"] = "success"
+            elif score >= 0.65:
+                o["outcome_category"] = "misstep"
+            elif score >= 0.55:
+                o["outcome_category"] = "costly_error"
+            else:
+                o["outcome_category"] = "missed_opportunity"
+        d["outcomes"] = outcomes
+
+        # Map DB field names to frontend-expected names
+        d["decision_rationale"] = d.get("decision_reasoning", "")
+        d["decision_making_dimensions"] = d.get("decision_criteria_used", {})
+        d["scenario_context"] = d.get("scenario_at_decision", "")
+
         role = fetch_one("roles", d["role_id"])
         d["role_title"] = role["title"] if role else "Unknown"
         selected = fetch_one("leaders", d["selected_candidate_id"])
@@ -120,6 +141,11 @@ def reconstruct_decision(decision_id: str) -> dict:
     decision["outcomes"] = fetch_by_column(
         "decision_outcomes", "decision_id", decision_id,
     )
+    # Map DB field names to frontend-expected names
+    decision["decision_rationale"] = decision.get("decision_reasoning", "")
+    decision["decision_making_dimensions"] = decision.get("decision_criteria_used", {})
+    decision["scenario_context"] = decision.get("scenario_at_decision", "")
+
     # Get genomes for selected and runner-up
     for key in ["selected_candidate_id", "runner_up_candidate_id"]:
         cid = decision.get(key)

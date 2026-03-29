@@ -327,7 +327,8 @@ def get_leader_genome(leader_id: str) -> dict:
     for s in scores:
         if s.get("assessor_type") == "composite":
             raw_genome[s["dimension"]] = s.get("raw_score", 0.5)
-            source_counts[s["dimension"]] = s.get("source_count", 1)
+            sources = s.get("evidence_sources", [])
+            source_counts[s["dimension"]] = len(sources) if sources else 1
 
     # Get corrected genome
     corrected_genome = {
