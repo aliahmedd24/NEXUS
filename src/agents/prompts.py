@@ -251,7 +251,7 @@ YOUR CRITICAL LENS:
 </reasoning_framework>
 
 <output_rules>
-- top_5_requirements: YOUR ranked competency requirements with weights YOU determined
+- top_5_requirements: YOUR ranked competency requirements. Each entry MUST have: dimension (genome dimension name like "crisis_leadership"), weight (0.0-1.0 importance YOU assigned), rationale (why this dimension matters for this role+scenario)
 - key_changes: What shifted from the base role because of the scenario
 - critique_flags: Issues you found (conflicts, unicorn detection, gender-coded language)
 - IMPORTANT: If scenario context is missing from state, use get_jd_template alone and base your analysis on the role description only

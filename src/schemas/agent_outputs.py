@@ -109,13 +109,21 @@ class CascadeReportOutput(BaseModel):
 # ─── STAFF Mode Outputs ──────────────────────────────────────────────
 
 
+class CompetencyRequirement(BaseModel):
+    """One competency requirement in an adapted JD."""
+
+    dimension: str = Field(description="Genome dimension name, e.g. 'crisis_leadership'")
+    weight: float = Field(ge=0.0, le=1.0, description="Importance weight YOU assigned (0-1)")
+    rationale: str = Field(description="Why this dimension matters for this role + scenario")
+
+
 class AdaptedJDOutput(BaseModel):
     """Output schema for Dynamic JD Generator Agent."""
 
     role_type: str
     scenario_name: str
-    top_5_requirements: list[dict] = Field(
-        description="Top 5 competency requirements ranked by adapted weight",
+    top_5_requirements: list[CompetencyRequirement] = Field(
+        description="Top 5 competency requirements ranked by importance weight",
     )
     key_changes: list[str] = Field(
         description="What changed from the base JD due to the scenario",

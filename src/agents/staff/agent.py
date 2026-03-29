@@ -11,18 +11,13 @@ ADK best practices applied:
 - Thinking enabled for transparent reasoning
 """
 
-import click
 import structlog
 from google.adk.agents import LlmAgent, SequentialAgent
 from google.genai import types
 
+from src.agents.callbacks import log_tool_call, strip_code_fences
+
 logger = structlog.get_logger()
-
-
-def _log_tool_call(tool, args, tool_context):
-    """Print tool calls to terminal so the user sees progress."""
-    click.echo(f"  ⚙ {tool.name}({', '.join(f'{k}={v!r}' for k, v in args.items())})", err=True)
-    return None
 
 
 def _validate_genome_input(callback_context):
@@ -103,7 +98,8 @@ jd_generator_agent = LlmAgent(
         temperature=0.2,
         thinking_config=types.ThinkingConfig(include_thoughts=True),
     ),
-    before_tool_callback=_log_tool_call,
+    before_tool_callback=log_tool_call,
+    after_model_callback=strip_code_fences,
 )
 
 genome_agent = LlmAgent(
@@ -124,7 +120,8 @@ genome_agent = LlmAgent(
         temperature=0.4,
         thinking_config=types.ThinkingConfig(include_thoughts=True),
     ),
-    before_tool_callback=_log_tool_call,
+    before_tool_callback=log_tool_call,
+    after_model_callback=strip_code_fences,
     before_agent_callback=_validate_genome_input,
 )
 
@@ -145,7 +142,8 @@ team_chemistry_agent = LlmAgent(
         temperature=0.4,
         thinking_config=types.ThinkingConfig(include_thoughts=True),
     ),
-    before_tool_callback=_log_tool_call,
+    before_tool_callback=log_tool_call,
+    after_model_callback=strip_code_fences,
     before_agent_callback=_validate_chemistry_input,
 )
 
@@ -171,7 +169,8 @@ portfolio_optimizer_agent = LlmAgent(
         temperature=0.3,
         thinking_config=types.ThinkingConfig(include_thoughts=True),
     ),
-    before_tool_callback=_log_tool_call,
+    before_tool_callback=log_tool_call,
+    after_model_callback=strip_code_fences,
     before_agent_callback=_validate_portfolio_input,
 )
 

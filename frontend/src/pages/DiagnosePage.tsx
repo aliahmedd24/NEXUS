@@ -301,8 +301,27 @@ export function DiagnosePage({ scenarios, onResultReady, compoundScenario, injec
                     <th style={thStyle}>Role</th>
                     <th style={thStyle}>Leader</th>
                     {dimensions.map(d => (
-                      <th key={d} style={{ ...thStyle, fontSize: 10, maxWidth: 80 }}>
-                        {formatDimension(d)}
+                      <th key={d} style={{
+                        ...thStyle,
+                        fontSize: 10,
+                        width: 44,
+                        minWidth: 44,
+                        maxWidth: 44,
+                        height: 120,
+                        verticalAlign: 'bottom',
+                        padding: '0 0 8px 0',
+                        position: 'relative',
+                      }}>
+                        <div style={{
+                          position: 'absolute',
+                          bottom: 8,
+                          left: '50%',
+                          transformOrigin: 'bottom left',
+                          transform: 'rotate(-55deg) translateX(-50%)',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {formatDimension(d)}
+                        </div>
                       </th>
                     ))}
                     <th style={thStyle}>Gap</th>
@@ -341,7 +360,7 @@ export function DiagnosePage({ scenarios, onResultReady, compoundScenario, injec
                             const gap = cell.gap_dimensions[dim] || 0;
                             const isVacant = !cell.leader_name;
                             return (
-                              <td key={dim} style={tdStyle}>
+                              <td key={dim} style={{ ...tdStyle, textAlign: 'center', padding: '6px 4px' }}>
                                 <motion.div
                                   initial={{ opacity: 0 }}
                                   animate={{ opacity: 1 }}
@@ -351,6 +370,7 @@ export function DiagnosePage({ scenarios, onResultReady, compoundScenario, injec
                                     width: 36,
                                     height: 22,
                                     borderRadius: 3,
+                                    margin: '0 auto',
                                     background: isVacant
                                       ? 'repeating-linear-gradient(45deg, #1e293b, #1e293b 3px, #374151 3px, #374151 6px)'
                                       : getGapCellColor(gap),
@@ -705,6 +725,7 @@ const thStyle: React.CSSProperties = {
   textAlign: 'left',
   borderBottom: '1px solid rgba(255,255,255,0.08)',
   whiteSpace: 'nowrap',
+  overflow: 'hidden',
 };
 
 const tdStyle: React.CSSProperties = {

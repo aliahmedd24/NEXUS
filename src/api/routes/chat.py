@@ -177,11 +177,14 @@ def _summarize_json_response(text: str, author: str) -> str | None:
         lines.append(f"Market pool: {pool}.")
         reqs = data.get("top_5_requirements", [])
         if reqs:
-            lines.append("Top requirements:")
+            lines.append("\nTop requirements:")
             for r in reqs[:5]:
                 dim = r.get("dimension", "?").replace("_", " ").title()
-                wt = r.get("adapted_weight", 0)
-                lines.append(f"• {dim} (weight: {wt:.2f})")
+                wt = r.get("weight", r.get("adapted_weight", 0))
+                rationale = r.get("rationale", "")
+                lines.append(f"• **{dim}** (weight: {wt:.2f})")
+                if rationale:
+                    lines.append(f"  {rationale}")
         flags = data.get("critique_flags", [])
         if flags:
             lines.append(f"\n⚠ Flags: {'; '.join(str(f) for f in flags[:3])}")

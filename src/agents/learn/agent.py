@@ -15,6 +15,8 @@ import structlog
 from google.adk.agents import LlmAgent, SequentialAgent
 from google.genai import types
 
+from src.agents.callbacks import log_tool_call, strip_code_fences
+
 from src.agents.prompts import (
     DECISION_REPLAY_INSTRUCTION,
     PATTERN_INTELLIGENCE_INSTRUCTION,
@@ -75,6 +77,8 @@ decision_replay_agent = LlmAgent(
         temperature=0.3,
         thinking_config=types.ThinkingConfig(include_thoughts=True),
     ),
+    before_tool_callback=log_tool_call,
+    after_model_callback=strip_code_fences,
 )
 
 pattern_intelligence_agent = LlmAgent(
@@ -99,6 +103,8 @@ pattern_intelligence_agent = LlmAgent(
         temperature=0.1,
         thinking_config=types.ThinkingConfig(include_thoughts=True),
     ),
+    before_tool_callback=log_tool_call,
+    after_model_callback=strip_code_fences,
     before_agent_callback=_validate_replay_output,
 )
 

@@ -8,6 +8,8 @@ board-ready decision briefs with dissent reports and confidence ratings.
 from google.adk.agents import LlmAgent
 from google.genai import types
 
+from src.agents.callbacks import log_tool_call, strip_code_fences
+
 from src.agents.prompts import BRIEF_GENERATOR_INSTRUCTION
 from src.config import settings
 from src.schemas.agent_outputs import DecisionBriefOutput
@@ -29,4 +31,6 @@ brief_generator_agent = LlmAgent(
         temperature=0.3,
         thinking_config=types.ThinkingConfig(include_thoughts=True),
     ),
+    before_tool_callback=log_tool_call,
+    after_model_callback=strip_code_fences,
 )
